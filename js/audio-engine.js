@@ -344,6 +344,7 @@ class AudioEngine {
         for (let i = 0; i < this.bands.length; i++) {
             if (i < zones.length) {
                 const z = zones[i];
+                this.bands[i].defaultFreq = z.centerFreq;
                 this.bands[i].freq = z.centerFreq;
                 this.bands[i].q = z.q || 2.0;
                 this.bands[i].type = "peaking";
@@ -376,12 +377,43 @@ class AudioEngine {
         }
     }
 
+    setSweetSpotFreq(index, freq) {
+        if (index < 0 || index >= this.bands.length) return;
+        const b = this.bands[index];
+        const defaultF = b.defaultFreq || b.freq;
+        const minF = Math.max(20, defaultF - 300);
+        const maxF = Math.min(20000, defaultF + 300);
+        const clampedFreq = Math.max(minF, Math.min(maxF, freq));
+        b.freq = clampedFreq;
+        const node = this.filterNodes[index];
+        if (node && this.ctx) {
+            node.frequency.setTargetAtTime(clampedFreq, this.ctx.currentTime, 0.01);
+        }
+    }
+
+    setSweetSpotType(index, type) {
+        if (index < 0 || index >= this.bands.length) return;
+        const validTypes = ["peaking", "lowshelf", "highshelf", "highpass", "lowpass"];
+        if (!validTypes.includes(type)) return;
+        this.bands[index].type = type;
+        const node = this.filterNodes[index];
+        if (node) {
+            node.type = type;
+        }
+    }
+
     resetSweetSpots() {
         for (let i = 0; i < this.bands.length; i++) {
             this.bands[i].gain = 0;
+            if (this.bands[i].defaultFreq) {
+                this.bands[i].freq = this.bands[i].defaultFreq;
+            }
+            this.bands[i].type = "peaking";
             const node = this.filterNodes[i];
-            if (node && node.gain && this.ctx) {
-                node.gain.setTargetAtTime(0, this.ctx.currentTime, 0.01);
+            if (node && this.ctx) {
+                node.type = "peaking";
+                node.frequency.setTargetAtTime(this.bands[i].freq, this.ctx.currentTime, 0.01);
+                if (node.gain) node.gain.setTargetAtTime(0, this.ctx.currentTime, 0.01);
             }
         }
     }

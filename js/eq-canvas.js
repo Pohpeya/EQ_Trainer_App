@@ -1,7 +1,7 @@
 /**
  * EQ Master Trainer - Interactive Spectrum Analyzer & Sweet-Spot Visualizer
  * Fully responsive for Desktop, Mobile Portrait & Mobile Landscape with Multi-Touch Support
- * Supports Low Cut (HPF) Visualization, Sweet Spot Gain & Interactive Q Width
+ * Supports Low Cut (HPF), ±300 Hz Frequency Sweep, Filter Type Shapes & Interactive Q Width
  */
 
 class EQCanvas {
@@ -9,7 +9,7 @@ class EQCanvas {
         this.canvas = canvas;
         this.ctx = canvas.getContext("2d");
         this.audio = audioEngine;
-        this.onSweetSpotChange = onSweetSpotChange;
+        this.onSweetSpotChange = onSweetSpotChange; // (index, gain, freq)
         this.onHoverChange = onHoverChange;
         this.onQChange = onQChange;
 
@@ -125,9 +125,10 @@ class EQCanvas {
             let minDistance = Infinity;
 
             for (let i = 0; i < this.activeZones.length; i++) {
-                const z = this.activeZones[i];
-                const nodeX = this.freqToX(z.centerFreq);
-                const currentGain = (this.audio.bands[i] ? this.audio.bands[i].gain : 0);
+                const b = this.audio.bands[i];
+                const curFreq = b ? b.freq : this.activeZones[i].centerFreq;
+                const nodeX = this.freqToX(curFreq);
+                const currentGain = b ? b.gain : 0;
                 const nodeY = this.dbToY(currentGain);
 
                 const dx = x - nodeX;
@@ -161,16 +162,25 @@ class EQCanvas {
             if (this.isDragging && this.draggedIndex !== -1) {
                 if (e.cancelable) e.preventDefault();
                 const newGain = Math.round(this.yToDb(pos.y) * 2) / 2; // snap to 0.5 dB
-                const clamped = Math.max(-12, Math.min(12, newGain));
+                const clampedGain = Math.max(-12, Math.min(12, newGain));
+
+                // Frequency shift (±300 Hz from default centerFreq)
+                const b = this.audio.bands[this.draggedIndex];
+                const defaultF = (b && b.defaultFreq) ? b.defaultFreq : (b ? b.freq : 100);
+                const minF = Math.max(20, defaultF - 300);
+                const maxF = Math.min(20000, defaultF + 300);
+                const rawFreq = this.xToFreq(pos.x);
+                const clampedFreq = Math.round(Math.max(minF, Math.min(maxF, rawFreq)));
+
                 if (this.onSweetSpotChange) {
-                    this.onSweetSpotChange(this.draggedIndex, clamped);
+                    this.onSweetSpotChange(this.draggedIndex, clampedGain, clampedFreq);
                 }
             } else {
                 const hovered = findNearestZone(pos.x, pos.y);
                 if (hovered !== this.hoveredIndex) {
                     this.hoveredIndex = hovered;
                     if (this.onHoverChange) this.onHoverChange(hovered);
-                    c.style.cursor = hovered !== -1 ? "ns-resize" : "crosshair";
+                    c.style.cursor = hovered !== -1 ? "move" : "crosshair";
                 }
             }
         };
@@ -184,7 +194,9 @@ class EQCanvas {
             const now = Date.now();
             if (nearest !== -1 && nearest === this.lastTapIndex && (now - this.lastTapTime) < 320) {
                 if (this.onSweetSpotChange) {
-                    this.onSweetSpotChange(nearest, 0);
+                    const b = this.audio.bands[nearest];
+                    const defaultF = b ? (b.defaultFreq || b.freq) : 100;
+                    this.onSweetSpotChange(nearest, 0, defaultF);
                 }
                 this.lastTapTime = 0;
                 this.lastTapIndex = -1;
@@ -198,12 +210,20 @@ class EQCanvas {
                 this.isDragging = true;
                 this.draggedIndex = nearest;
                 this.hoveredIndex = nearest;
-                c.style.cursor = "ns-resize";
+                c.style.cursor = "move";
 
                 const newGain = Math.round(this.yToDb(pos.y) * 2) / 2;
-                const clamped = Math.max(-12, Math.min(12, newGain));
+                const clampedGain = Math.max(-12, Math.min(12, newGain));
+
+                const b = this.audio.bands[nearest];
+                const defaultF = (b && b.defaultFreq) ? b.defaultFreq : (b ? b.freq : 100);
+                const minF = Math.max(20, defaultF - 300);
+                const maxF = Math.min(20000, defaultF + 300);
+                const rawFreq = this.xToFreq(pos.x);
+                const clampedFreq = Math.round(Math.max(minF, Math.min(maxF, rawFreq)));
+
                 if (this.onSweetSpotChange) {
-                    this.onSweetSpotChange(nearest, clamped);
+                    this.onSweetSpotChange(nearest, clampedGain, clampedFreq);
                 }
             }
         };
@@ -212,7 +232,7 @@ class EQCanvas {
         const onEnd = () => {
             this.isDragging = false;
             this.draggedIndex = -1;
-            c.style.cursor = this.hoveredIndex !== -1 ? "ns-resize" : "crosshair";
+            c.style.cursor = this.hoveredIndex !== -1 ? "move" : "crosshair";
         };
 
         // Mouse Wheel for Q adjustment on node
@@ -243,7 +263,9 @@ class EQCanvas {
             const pos = getPos(e);
             const nearest = findNearestZone(pos.x, pos.y);
             if (nearest !== -1 && this.onSweetSpotChange) {
-                this.onSweetSpotChange(nearest, 0);
+                const b = this.audio.bands[nearest];
+                const defaultF = b ? (b.defaultFreq || b.freq) : 100;
+                this.onSweetSpotChange(nearest, 0, defaultF);
             }
         });
 
@@ -271,7 +293,7 @@ class EQCanvas {
         // 4. Draw Composite EQ Curve
         this.drawMasterEQCurve(ctx, w, h);
 
-        // 5. Draw Sweet-Spot Target Lines, Interactive Pin Callouts & Q Bandwidth
+        // 5. Draw Sweet-Spot Target Lines, Filter Types & Interactive Pin Callouts
         this.drawSweetSpots(ctx, w, h);
     }
 
@@ -281,7 +303,6 @@ class EQCanvas {
 
         ctx.save();
 
-        // Background dark gradient
         const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
         bgGrad.addColorStop(0, "#0b0f19");
         bgGrad.addColorStop(1, "#070a10");
@@ -321,7 +342,6 @@ class EQCanvas {
             ctx.lineWidth = isZero ? 1.4 : 1;
             ctx.stroke();
 
-            // Label on major levels
             if (isMajor) {
                 ctx.fillStyle = isZero ? "rgba(255, 255, 255, 0.7)" : "rgba(255, 255, 255, 0.28)";
                 ctx.font = isZero ? "700 9.5px 'JetBrains Mono', monospace" : "500 9px 'JetBrains Mono', monospace";
@@ -400,14 +420,12 @@ class EQCanvas {
 
         ctx.save();
 
-        // Shaded cut area to the left of Low Cut
         const cutGrad = ctx.createLinearGradient(0, 0, x, 0);
         cutGrad.addColorStop(0, "rgba(245, 158, 11, 0.18)");
         cutGrad.addColorStop(1, "rgba(245, 158, 11, 0.02)");
         ctx.fillStyle = cutGrad;
         ctx.fillRect(0, this.paddingTop, x, bottomY - this.paddingTop);
 
-        // Vertical dashed line
         ctx.beginPath();
         ctx.setLineDash([4, 4]);
         ctx.moveTo(x, this.paddingTop);
@@ -418,7 +436,6 @@ class EQCanvas {
         ctx.shadowBlur = 8;
         ctx.stroke();
 
-        // Top Flag Badge
         const tag = `HPF · ${Math.round(lcFreq)} Hz`;
         ctx.font = "700 10.5px 'JetBrains Mono', monospace";
         const tagW = ctx.measureText(tag).width + 12;
@@ -465,7 +482,7 @@ class EQCanvas {
                 }
             }
 
-            // 2. Include Sweet Spot Peaking Filters
+            // 2. Include Sweet Spot Filters
             for (let b = 0; b < this.audio.bands.length; b++) {
                 if (this.audio.bands[b].enabled && nodes[b]) {
                     nodes[b].getFrequencyResponse(this.responseFreqs, tempMag, tempPhase);
@@ -505,16 +522,45 @@ class EQCanvas {
         ctx.save();
 
         this.activeZones.forEach((zone, index) => {
-            const freq = zone.centerFreq;
+            const b = this.audio.bands[index];
+            const freq = b ? b.freq : zone.centerFreq;
+            const defaultFreq = b ? (b.defaultFreq || zone.centerFreq) : zone.centerFreq;
+            const isShifted = Math.abs(freq - defaultFreq) > 1;
+            const shiftDelta = Math.round(freq - defaultFreq);
+            const type = b ? b.type : "peaking";
+
             const x = Math.round(this.freqToX(freq));
-            const currentGain = (this.audio.bands[index] ? this.audio.bands[index].gain : 0);
-            const q = (this.audio.bands[index] ? this.audio.bands[index].q : (zone.q || 1.4));
+            const currentGain = b ? b.gain : 0;
+            const q = b ? b.q : (zone.q || 1.4);
             const nodeY = Math.round(this.dbToY(currentGain));
             const color = zone.color || "#00d2ff";
             const isHovered = (this.hoveredIndex === index || this.draggedIndex === index);
 
+            // Filter Type abbreviation
+            const typeAbbr = {
+                peaking: "Bell",
+                lowshelf: "L-Shelf",
+                highshelf: "H-Shelf",
+                highpass: "HPF",
+                lowpass: "LPF"
+            }[type] || "Bell";
+
+            // Reference line for original center frequency (if shifted)
+            if (isShifted) {
+                const defX = Math.round(this.freqToX(defaultFreq));
+                ctx.save();
+                ctx.beginPath();
+                ctx.setLineDash([2, 4]);
+                ctx.moveTo(defX, this.paddingTop + 24);
+                ctx.lineTo(defX, bottomY);
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                ctx.restore();
+            }
+
             // 1. Q Bandwidth Visualization on Hover/Drag
-            if (isHovered && currentGain !== 0) {
+            if (isHovered && currentGain !== 0 && type === "peaking") {
                 const f0 = freq;
                 const f1 = f0 * (Math.sqrt(1 + 1 / (4 * q * q)) - 1 / (2 * q));
                 const f2 = f0 * (Math.sqrt(1 + 1 / (4 * q * q)) + 1 / (2 * q));
@@ -554,14 +600,15 @@ class EQCanvas {
             ctx.stroke();
             ctx.restore();
 
-            // 3. Top Pin Badge Callout (Tag with frequency, name & Q)
+            // 3. Top Pin Badge Callout (Tag with frequency, name, type & Q)
             const cleanName = zone.name.split("(")[0].trim();
             const freqText = freq >= 1000 ? `${(freq / 1000).toFixed(1)}k` : `${Math.round(freq)}`;
-            const pinText = `${freqText} Hz · ${cleanName} · Q:${q.toFixed(1)}`;
+            const shiftStr = isShifted ? ` (${shiftDelta > 0 ? "+" : ""}${shiftDelta})` : "";
+            const pinText = `${freqText} Hz${shiftStr} · ${cleanName} · ${typeAbbr}`;
 
             ctx.font = "600 11px 'Prompt', sans-serif";
             const textWidth = ctx.measureText(pinText).width;
-            const badgeW = Math.max(76, textWidth + 14);
+            const badgeW = Math.max(80, textWidth + 14);
             const badgeH = 22;
             const badgeX = Math.max(4, Math.min(w - badgeW - 4, x - badgeW / 2));
             const badgeY = 12;

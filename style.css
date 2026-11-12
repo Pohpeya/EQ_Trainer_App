@@ -708,6 +708,18 @@ html, body {
     flex-shrink: 0;
 }
 
+.card-type-badge {
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 700;
+    color: #fbbf24;
+    background: rgba(251, 191, 36, 0.12);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
 .card-q-badge {
     font-family: var(--font-mono);
     font-size: 11px;
@@ -746,6 +758,64 @@ html, body {
 
 .card-gain-readout.flat {
     color: var(--text-secondary);
+}
+
+/* Sub-control Shared Label */
+.sub-ctrl-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+/* ==========================================================================
+   6.5 FILTER SHAPE / BAND TYPE SELECTION
+   ========================================================================== */
+.card-filter-types-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-sm);
+    padding: 6px 8px;
+    flex-wrap: wrap;
+}
+
+.type-btn-group {
+    display: flex;
+    gap: 3px;
+    flex-wrap: wrap;
+    flex: 1;
+    justify-content: flex-end;
+}
+
+.btn-type {
+    padding: 3px 6px;
+    font-size: 10px;
+    font-family: var(--font-sans);
+    font-weight: 500;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.12s ease;
+    white-space: nowrap;
+}
+
+.btn-type:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--text-primary);
+}
+
+.btn-type.active {
+    background: rgba(251, 191, 36, 0.2);
+    border-color: #fbbf24;
+    color: #ffffff;
+    font-weight: 700;
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.35);
 }
 
 /* ==========================================================================
@@ -870,6 +940,98 @@ html, body {
     border-radius: 4px;
     background: rgba(0, 0, 0, 0.35);
     outline: none;
+    accent-color: var(--zone-color, #00d2ff);
+    cursor: pointer;
+}
+
+/* ==========================================================================
+   7.5 FREQUENCY SWEEP / SHIFT (±300 Hz)
+   ========================================================================== */
+.card-freq-shift-section {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-sm);
+    padding: 7px 9px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.freq-shift-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+.freq-readout-wrap {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.freq-val-text {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--accent-cyan);
+}
+
+.freq-delta-pill {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-muted);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.freq-delta-pill.shifted {
+    background: rgba(0, 229, 255, 0.15);
+    color: #67e8f9;
+    border-color: rgba(0, 229, 255, 0.35);
+}
+
+.btn-reset-freq {
+    padding: 2px 7px;
+    font-size: 10px;
+    font-family: var(--font-sans);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.12s ease;
+}
+
+.btn-reset-freq:hover {
+    background: rgba(255, 255, 255, 0.14);
+    color: var(--text-primary);
+    border-color: var(--accent-cyan);
+}
+
+.freq-shift-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.f-limit {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    color: var(--text-muted);
+    min-width: 44px;
+}
+
+.f-limit:last-child {
+    text-align: right;
+}
+
+.freq-range {
+    flex: 1;
+    height: 5px;
     accent-color: var(--zone-color, #00d2ff);
     cursor: pointer;
 }
@@ -1087,6 +1249,29 @@ html, body {
     .btn-step {
         font-size: 10.5px;
         min-height: 34px;
+    }
+
+    .card-filter-types-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+    }
+
+    .type-btn-group {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 3px;
+        width: 100%;
+    }
+
+    .btn-type {
+        padding: 6px 2px;
+        font-size: 9.5px;
+        text-align: center;
+        min-height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
     .sec-subtitle {
