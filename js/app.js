@@ -69,28 +69,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const knobGainArc = document.getElementById("knobGainArc");
     const knobQArc = document.getElementById("knobQArc");
 
-    // Guide, Presets & Dock Tabs
+    // Guide, Presets & Interactive Spectrum
     const currentInstTitle = document.getElementById("currentInstTitle");
     const currentInstDesc = document.getElementById("currentInstDesc");
     const zonesList = document.getElementById("zonesList");
     const presetsChipsContainer = document.getElementById("presetsChipsContainer");
-    const dockTabBtns = document.querySelectorAll(".dock-tab-btn");
-    const dockPanelGuide = document.getElementById("dockPanelGuide");
-    const dockPanelQuiz = document.getElementById("dockPanelQuiz");
-
-    // Quiz Elements
-    const startQuizBtn = document.getElementById("startQuizBtn");
-    const stopQuizBtn = document.getElementById("stopQuizBtn");
-    const quizSetupBox = document.getElementById("quizSetupBox");
-    const quizActiveArea = document.getElementById("quizActiveArea");
-    const quizChoicesGrid = document.getElementById("quizChoicesGrid");
-    const quizBypassBtn = document.getElementById("quizBypassBtn");
-    const quizNextBtn = document.getElementById("quizNextBtn");
-    const quizFeedback = document.getElementById("quizFeedback");
-    const quizScoreVal = document.getElementById("quizScoreVal");
-    const quizStreakVal = document.getElementById("quizStreakVal");
-    const quizTotalVal = document.getElementById("quizTotalVal");
-    const diffBtns = document.querySelectorAll(".diff-btn");
+    const zonesSpectrumTrack = document.getElementById("zonesSpectrumTrack");
+    const toggleAllZonesBtn = document.getElementById("toggleAllZonesBtn");
+    const toggleAllZonesIcon = document.getElementById("toggleAllZonesIcon");
+    const toggleAllZonesText = document.getElementById("toggleAllZonesText");
 
     // Logarithmic slider helpers for Parametric Frequency slider (0..1000 <-> 20..20000 Hz)
     function sliderToFreq(val) {
@@ -144,27 +131,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
     canvas.draw();
 
-    // 3. Initialize Quiz Subsystem
-    const quiz = new EQQuiz(audio, canvas, () => {
-        updateQuizUI();
-    });
+    // -------------------------------------------------------------
+    // MOBILE BOTTOM VIEW NAVIGATION (ALL / EQ / GUIDE)
+    // -------------------------------------------------------------
+    const appMainWorkspace = document.getElementById("appMainWorkspace");
+    const mobileNavBtns = document.querySelectorAll(".mob-nav-btn");
 
-    // -------------------------------------------------------------
-    // RIGHT DOCK TABS (TONE GUIDE vs GOLDEN EARS QUIZ)
-    // -------------------------------------------------------------
-    dockTabBtns.forEach(btn => {
-        btn.addEventListener("click", () => {
-            const target = btn.dataset.docktab;
-            dockTabBtns.forEach(b => b.classList.toggle("active", b === btn));
-            if (target === "quiz") {
-                dockPanelGuide.style.display = "none";
-                dockPanelQuiz.style.display = "flex";
-            } else {
-                dockPanelGuide.style.display = "flex";
-                dockPanelQuiz.style.display = "none";
-            }
+    if (mobileNavBtns.length > 0 && appMainWorkspace) {
+        mobileNavBtns.forEach(btn => {
+            btn.addEventListener("click", () => {
+                const view = btn.dataset.mobview;
+                mobileNavBtns.forEach(b => b.classList.toggle("active", b === btn));
+                appMainWorkspace.classList.remove("mob-view-all", "mob-view-eq", "mob-view-guide");
+                appMainWorkspace.classList.add(`mob-view-${view}`);
+                setTimeout(() => canvas.resize(), 40);
+            });
         });
-    });
+    }
 
     // -------------------------------------------------------------
     // DISPLAY dB RANGE SWITCHER (±12, ±18, ±30 dB)
@@ -444,7 +427,12 @@ document.addEventListener("DOMContentLoaded", () => {
             p.classList.remove("active");
         });
         const match = document.querySelector(`.instrument-pill[data-inst-id="${instId}"]`);
-        if (match) match.classList.add("active");
+        if (match) {
+            match.classList.add("active");
+            try {
+                match.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+            } catch (err) {}
+        }
 
         const data = INSTRUMENTS_DATA[instId];
         if (data) {
@@ -462,65 +450,215 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // -------------------------------------------------------------
-    // FREQUENCY CHARACTERISTICS GUIDE ("เนื้อเสียงที่ถูกต้อง")
+    // INTERACTIVE ACOUSTIC TONE INSPECTOR ("คู่มือวิเคราะห์ย่านเสียง")
     // -------------------------------------------------------------
+    let expandedZoneIndices = new Set([0]); // Default to 1st zone open
+    let activeAuditionState = { centerFreq: null, gain: 0 };
+    let allZonesExpanded = false;
+
+    if (toggleAllZonesBtn) {
+        toggleAllZonesBtn.addEventListener("click", () => {
+            const currentZones = INSTRUMENTS_DATA[currentInstrumentId]?.zones || [];
+            if (allZonesExpanded) {
+                expandedZoneIndices.clear();
+                allZonesExpanded = false;
+                if (toggleAllZonesIcon) toggleAllZonesIcon.textContent = "📂";
+                if (toggleAllZonesText) toggleAllZonesText.textContent = "ขยายทุกย่าน";
+            } else {
+                currentZones.forEach((_, i) => expandedZoneIndices.add(i));
+                allZonesExpanded = true;
+                if (toggleAllZonesIcon) toggleAllZonesIcon.textContent = "📁";
+                if (toggleAllZonesText) toggleAllZonesText.textContent = "ยุบทุกย่าน";
+            }
+            updateZonesAccordionVisuals();
+        });
+    }
+
+    function updateZonesAccordionVisuals() {
+        const cards = zonesList.querySelectorAll(".zone-card");
+        cards.forEach((card, idx) => {
+            const isExp = expandedZoneIndices.has(idx);
+            card.classList.toggle("is-expanded", isExp);
+            const drawer = card.querySelector(".zone-drawer");
+            const chev = card.querySelector(".zone-chevron");
+            if (drawer) drawer.style.display = isExp ? "flex" : "none";
+            if (chev) chev.textContent = isExp ? "▲" : "▼";
+        });
+    }
+
     function renderZonesGuide(zones) {
         zonesList.innerHTML = "";
+        if (zonesSpectrumTrack) zonesSpectrumTrack.innerHTML = "";
+        expandedZoneIndices = new Set([0]); // Reset to 1st zone open
+        allZonesExpanded = false;
+        if (toggleAllZonesIcon) toggleAllZonesIcon.textContent = "📂";
+        if (toggleAllZonesText) toggleAllZonesText.textContent = "ขยายทุกย่าน";
+
         if (!zones || zones.length === 0) {
-            zonesList.innerHTML = "<p style='color: var(--text-muted); font-size: 13px;'>ไม่มีข้อมูลย่านสำหรับไฟล์ที่นำเข้าเอง</p>";
+            zonesList.innerHTML = "<p style='color: var(--text-muted); font-size: 13.5px; padding: 14px;'>ไม่มีข้อมูลย่านเสียงสำหรับการวิเคราะห์ไฟล์ที่นำเข้าเอง</p>";
+            if (zonesSpectrumTrack) zonesSpectrumTrack.style.display = "none";
             return;
         }
 
-        zones.forEach(zone => {
+        if (zonesSpectrumTrack) zonesSpectrumTrack.style.display = "flex";
+
+        // 1. Render Horizontal Spectrum Quick-Chips
+        zones.forEach((zone, idx) => {
+            const chip = document.createElement("button");
+            chip.type = "button";
+            chip.className = `spectrum-chip ${idx === 0 ? "active" : ""}`;
+            chip.dataset.zoneIdx = idx;
+            chip.style.setProperty("--chip-color", zone.color || "#00d2ff");
+            chip.innerHTML = `
+                <span class="spectrum-dot" style="background:${zone.color}"></span>
+                <strong class="spectrum-freq">${formatHz(zone.centerFreq)}</strong>
+                <span class="spectrum-name">${zone.name.split("(")[0].trim()}</span>
+            `;
+
+            chip.addEventListener("click", () => {
+                document.querySelectorAll(".spectrum-chip").forEach(c => c.classList.remove("active"));
+                chip.classList.add("active");
+                canvas.setHighlightedZone(zone);
+
+                // Expand this card
+                expandedZoneIndices.add(idx);
+                updateZonesAccordionVisuals();
+
+                const targetCard = zonesList.querySelector(`.zone-card[data-zone-idx="${idx}"]`);
+                if (targetCard) {
+                    targetCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                }
+            });
+
+            chip.addEventListener("mouseenter", () => canvas.setHighlightedZone(zone));
+            chip.addEventListener("mouseleave", () => canvas.setHighlightedZone(null));
+
+            zonesSpectrumTrack.appendChild(chip);
+        });
+
+        // 2. Render Interactive Accordion Zone Cards
+        zones.forEach((zone, idx) => {
+            const isExpanded = expandedZoneIndices.has(idx);
             const card = document.createElement("div");
-            card.className = "zone-card";
+            card.className = `zone-card ${isExpanded ? "is-expanded" : ""}`;
+            card.dataset.zoneIdx = idx;
             card.style.setProperty("--zone-color", zone.color || "#00d2ff");
-            card.style.borderLeftColor = zone.color || "var(--accent-cyan)";
+
+            const isBoostActive = activeAuditionState.centerFreq === zone.centerFreq && activeAuditionState.gain > 0;
+            const isCutActive = activeAuditionState.centerFreq === zone.centerFreq && activeAuditionState.gain < 0;
 
             card.innerHTML = `
-                <div class="zone-header">
-                    <span class="zone-title" style="color:${zone.color}">${zone.name}</span>
-                    <span class="zone-freq-badge">${zone.range}</span>
+                <div class="zone-header" title="แตะเพื่อขยายหรือยุบดูรายละเอียด">
+                    <div class="zone-header-left">
+                        <span class="zone-color-bar" style="background:${zone.color}"></span>
+                        <div class="zone-freq-cluster">
+                            <span class="zone-center-pill" style="color:${zone.color}; border-color:${zone.color}50">${formatHz(zone.centerFreq)}</span>
+                            <span class="zone-range-text">${zone.range}</span>
+                        </div>
+                        <div class="zone-title-block">
+                            <div class="zone-title" style="color:${zone.color}">${zone.name}</div>
+                            <div class="zone-teaser">${zone.idealTone}</div>
+                        </div>
+                    </div>
+                    <div class="zone-header-right">
+                        <div class="quick-audition-group">
+                            <button type="button" class="quick-aud-btn btn-boost ${isBoostActive ? 'active' : ''}" title="ทดลองเร่ง +6 dB">
+                                🔺 +6dB
+                            </button>
+                            <button type="button" class="quick-aud-btn btn-cut ${isCutActive ? 'active' : ''}" title="ทดลองตัด -6 dB">
+                                🔻 -6dB
+                            </button>
+                        </div>
+                        <span class="zone-chevron">${isExpanded ? "▲" : "▼"}</span>
+                    </div>
                 </div>
-                <div class="zone-body">
-                    <div class="zone-item"><span class="zone-tag tag-ideal">🎯 เนื้อเสียง</span> <span>${zone.idealTone}</span></div>
-                    <div class="zone-item"><span class="zone-tag tag-boost">🔺 ถ้าดันเยอะ</span> <span>${zone.ifBoosted}</span></div>
-                    <div class="zone-item"><span class="zone-tag tag-cut">🔻 ถ้าคัตออก</span> <span>${zone.ifCut}</span></div>
-                    <div class="zone-protip">💡 <strong>Pro Tip:</strong> ${zone.proTip}</div>
-                </div>
-                <div class="zone-actions-row">
-                    <button type="button" class="zone-act-btn boost-act" title="ทดลองบูสต์ย่านนี้ +6 dB เพื่อฟังคาแรกเตอร์เสียง">
-                        🔊 ฟังย่านนี้ (+6 dB)
-                    </button>
-                    <button type="button" class="zone-act-btn cut-act" title="ทดลองคัตย่านนี้ -6 dB เพื่อฟังความสะอาดเมื่อตัดออก">
-                        ✂️ ลองคัต (-6 dB)
-                    </button>
+
+                <div class="zone-drawer" style="display: ${isExpanded ? 'flex' : 'none'}">
+                    <div class="zone-spec-grid">
+                        <div class="zone-spec-card spec-ideal">
+                            <div class="spec-label">🎯 เนื้อเสียงมาตรฐานที่ถูกต้อง (Target Sound)</div>
+                            <div class="spec-desc">${zone.idealTone}</div>
+                        </div>
+                        <div class="zone-spec-card spec-boost">
+                            <div class="spec-label">🔺 ผลลัพธ์เมื่อบูสต์ (When Boosted)</div>
+                            <div class="spec-desc">${zone.ifBoosted}</div>
+                        </div>
+                        <div class="zone-spec-card spec-cut">
+                            <div class="spec-label">🔻 ผลลัพธ์เมื่อคัตออก (When Cut)</div>
+                            <div class="spec-desc">${zone.ifCut}</div>
+                        </div>
+                        <div class="zone-spec-card spec-protip">
+                            <div class="spec-label">💡 Pro Mixing Tip &amp; คำแนะนำการมิกซ์</div>
+                            <div class="spec-desc">${zone.proTip}</div>
+                        </div>
+                    </div>
+
+                    <div class="zone-audition-bar">
+                        <button type="button" class="zone-aud-btn aud-boost ${isBoostActive ? 'active' : ''}">
+                            🔊 ลองเร่ง (+6 dB)
+                        </button>
+                        <button type="button" class="zone-aud-btn aud-cut ${isCutActive ? 'active' : ''}">
+                            ✂️ ลองตัด (-6 dB)
+                        </button>
+                        <button type="button" class="zone-aud-btn aud-flat">
+                            🔄 คืนค่า Flat (0 dB)
+                        </button>
+                    </div>
                 </div>
             `;
 
-            // Hovering card spotlights that zone on the EQ Analyzer Canvas!
-            card.addEventListener("mouseenter", () => {
+            // Hover card to spotlight on canvas
+            card.addEventListener("mouseenter", () => canvas.setHighlightedZone(zone));
+            card.addEventListener("mouseleave", () => canvas.setHighlightedZone(null));
+
+            // Tap Header to Toggle Drawer (unless clicking buttons)
+            const header = card.querySelector(".zone-header");
+            header.addEventListener("click", (e) => {
+                if (e.target.closest(".quick-aud-btn")) return;
+                if (expandedZoneIndices.has(idx)) {
+                    expandedZoneIndices.delete(idx);
+                } else {
+                    expandedZoneIndices.add(idx);
+                }
+                updateZonesAccordionVisuals();
                 canvas.setHighlightedZone(zone);
-            });
-            card.addEventListener("mouseleave", () => {
-                canvas.setHighlightedZone(null);
+                document.querySelectorAll(".spectrum-chip").forEach(c => {
+                    c.classList.toggle("active", parseInt(c.dataset.zoneIdx, 10) === idx);
+                });
             });
 
-            const boostBtn = card.querySelector(".boost-act");
-            const cutBtn = card.querySelector(".cut-act");
+            // Quick Audition Buttons in Header
+            const qBoost = card.querySelector(".quick-aud-btn.btn-boost");
+            const qCut = card.querySelector(".quick-aud-btn.btn-cut");
 
-            boostBtn.addEventListener("click", (e) => {
+            qBoost.addEventListener("click", (e) => {
                 e.stopPropagation();
                 handleZoneAudition(zone, 6.0);
             });
 
-            cutBtn.addEventListener("click", (e) => {
+            qCut.addEventListener("click", (e) => {
                 e.stopPropagation();
                 handleZoneAudition(zone, -6.0);
             });
 
-            card.addEventListener("click", () => {
+            // Detailed Audition Buttons in Drawer
+            const audBoost = card.querySelector(".zone-aud-btn.aud-boost");
+            const audCut = card.querySelector(".zone-aud-btn.aud-cut");
+            const audFlat = card.querySelector(".zone-aud-btn.aud-flat");
+
+            audBoost.addEventListener("click", (e) => {
+                e.stopPropagation();
                 handleZoneAudition(zone, 6.0);
+            });
+
+            audCut.addEventListener("click", (e) => {
+                e.stopPropagation();
+                handleZoneAudition(zone, -6.0);
+            });
+
+            audFlat.addEventListener("click", (e) => {
+                e.stopPropagation();
+                handleZoneAudition(zone, 0.0);
             });
 
             zonesList.appendChild(card);
@@ -528,6 +666,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function handleZoneAudition(zone, targetGain = 6.0) {
+        activeAuditionState = { centerFreq: zone.centerFreq, gain: targetGain };
+
         if (audio.eqMode === "graphic") {
             let closestIdx = 0;
             let minDiff = Infinity;
@@ -548,13 +688,33 @@ document.addEventListener("DOMContentLoaded", () => {
                 freq: zone.centerFreq,
                 gain: targetGain,
                 q: zone.q || 2.0,
-                enabled: true
+                enabled: targetGain !== 0
             });
             syncBandRackUI(3);
             updateBandTabCard(3);
         }
 
-        if (!audio.isPlaying) {
+        // Highlight zone on canvas during audition
+        canvas.setHighlightedZone(zone);
+
+        // Update active classes across buttons
+        document.querySelectorAll(".zone-card").forEach(c => {
+            const idx = parseInt(c.dataset.zoneIdx, 10);
+            const z = (INSTRUMENTS_DATA[currentInstrumentId]?.zones || [])[idx];
+            const isThis = z && z.centerFreq === zone.centerFreq;
+
+            const qB = c.querySelector(".quick-aud-btn.btn-boost");
+            const qC = c.querySelector(".quick-aud-btn.btn-cut");
+            const aB = c.querySelector(".zone-aud-btn.aud-boost");
+            const aC = c.querySelector(".zone-aud-btn.aud-cut");
+
+            if (qB) qB.classList.toggle("active", isThis && targetGain > 0);
+            if (qC) qC.classList.toggle("active", isThis && targetGain < 0);
+            if (aB) aB.classList.toggle("active", isThis && targetGain > 0);
+            if (aC) aC.classList.toggle("active", isThis && targetGain < 0);
+        });
+
+        if (!audio.isPlaying && targetGain !== 0) {
             audio.start().then(() => {
                 updatePlayBtn();
             });
@@ -752,12 +912,13 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    // Interactive Rotary Knob Dragging & Mouse Wheel
+    // Interactive Rotary Knob Dragging, Touch & Mouse Wheel
     function setupRotaryKnobDrag(knobId, onDelta, onDblClick) {
         const el = document.getElementById(knobId);
         if (!el) return;
         let dragging = false;
         let lastY = 0;
+        let lastTapTime = 0;
 
         el.addEventListener("mousedown", (e) => {
             e.preventDefault();
@@ -778,6 +939,33 @@ document.addEventListener("DOMContentLoaded", () => {
                 dragging = false;
                 document.body.style.cursor = "";
             }
+        });
+
+        // Touch Support for Mobile Phones & Tablets
+        el.addEventListener("touchstart", (e) => {
+            if (e.touches.length !== 1) return;
+            const now = performance.now();
+            if (now - lastTapTime < 320 && onDblClick) {
+                e.preventDefault();
+                onDblClick();
+                lastTapTime = 0;
+                return;
+            }
+            lastTapTime = now;
+            dragging = true;
+            lastY = e.touches[0].clientY;
+        }, { passive: false });
+
+        el.addEventListener("touchmove", (e) => {
+            if (!dragging || e.touches.length !== 1) return;
+            e.preventDefault();
+            const dy = lastY - e.touches[0].clientY;
+            lastY = e.touches[0].clientY;
+            if (dy !== 0) onDelta(dy);
+        }, { passive: false });
+
+        el.addEventListener("touchend", () => {
+            dragging = false;
         });
 
         el.addEventListener("wheel", (e) => {
@@ -1015,113 +1203,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
     });
-
-    // -------------------------------------------------------------
-    // EAR TRAINING QUIZ SYSTEM
-    // -------------------------------------------------------------
-    startQuizBtn.addEventListener("click", async () => {
-        if (!audio.isPlaying) {
-            await audio.start();
-            updatePlayBtn();
-        }
-        quiz.start();
-        quizSetupBox.style.display = "none";
-        quizActiveArea.style.display = "flex";
-        quizFeedback.style.display = "none";
-        renderQuizChoices();
-    });
-
-    stopQuizBtn.addEventListener("click", () => {
-        quiz.stop();
-        quizSetupBox.style.display = "flex";
-        quizActiveArea.style.display = "none";
-        quizFeedback.style.display = "none";
-    });
-
-    diffBtns.forEach(btn => {
-        btn.addEventListener("click", () => {
-            diffBtns.forEach(b => b.classList.remove("active"));
-            btn.classList.add("active");
-            quiz.setDifficulty(btn.dataset.diff);
-            if (quiz.isActive) renderQuizChoices();
-        });
-    });
-
-    quizBypassBtn.addEventListener("click", () => {
-        quiz.toggleMysteryBypass();
-    });
-
-    quizNextBtn.addEventListener("click", () => {
-        quiz.nextQuestion();
-        quizFeedback.style.display = "none";
-        quizNextBtn.style.display = "none";
-        document.querySelectorAll(".quiz-choice-btn").forEach(b => b.disabled = false);
-    });
-
-    function renderQuizChoices() {
-        quizChoicesGrid.innerHTML = "";
-        const options = quiz.difficultyLevels[quiz.difficulty];
-
-        options.forEach(opt => {
-            const btn = document.createElement("button");
-            btn.className = "quiz-choice-btn";
-            btn.innerHTML = `
-                <span>${opt.label}</span>
-                <span class="quiz-choice-sub">${opt.range}</span>
-            `;
-            btn.addEventListener("click", () => {
-                handleQuizAnswer(opt.freq);
-            });
-            quizChoicesGrid.appendChild(btn);
-        });
-    }
-
-    function handleQuizAnswer(freq) {
-        document.querySelectorAll(".quiz-choice-btn").forEach(b => b.disabled = true);
-        const res = quiz.checkAnswer(freq);
-
-        quizScoreVal.textContent = res.score;
-        quizStreakVal.textContent = res.streak + " 🔥";
-        quizTotalVal.textContent = res.total;
-
-        const isCorrect = res.isCorrect;
-        quizFeedback.className = `quiz-feedback-box ${isCorrect ? "correct" : "incorrect"}`;
-        quizFeedback.style.display = "flex";
-
-        const correctHz = res.correctFreq >= 1000 ? (res.correctFreq / 1000) + " kHz" : res.correctFreq + " Hz";
-        const sign = res.gain > 0 ? "+" : "";
-
-        quizFeedback.innerHTML = `
-            <div style="font-size: 14px; font-weight: 700;">
-                ${isCorrect ? "🎉 ถูกต้องยอดเยี่ยม! (Correct)" : "❌ ยังไม่ถูกต้อง (Incorrect)"}
-            </div>
-            <div style="font-size: 12.5px;">
-                ย่านที่เปลี่ยนคือ: <strong>${correctHz} (${sign}${res.gain} dB)</strong> • <strong>${res.action}</strong>
-            </div>
-            <div style="font-size: 11.5px; opacity: 0.9;">
-                ${getFrequencySoundDescription(res.correctFreq)}
-            </div>
-        `;
-
-        quizNextBtn.style.display = "inline-flex";
-    }
-
-    function updateQuizUI() {
-        quizBypassBtn.innerHTML = quiz.isMysteryBypassed ?
-            "<span>👂 กำลังฟัง: เสียงปกติ (Normal Flat)</span>" :
-            "<span>🎧 กำลังฟัง: เสียงที่ถูก EQ (Mystery EQ)</span>";
-        quizBypassBtn.classList.toggle("btn-active", !quiz.isMysteryBypassed);
-    }
-
-    function getFrequencySoundDescription(freq) {
-        if (freq <= 100) return "ย่าน Sub-Bass & Punch แรงกระแทกของกระเดื่องและฐานเสียงเบส หากดันจะแน่นลึก หากคัตจะรู้สึกเบาโหวง";
-        if (freq <= 250) return "ย่าน Body & Warmth ความหนาของสแนร์และเสียงร้อง หากดันมากไปจะบวมอับทึบ";
-        if (freq <= 500) return "ย่าน Boxiness & Mud เสียงเหมือนเคาะกล่องกระดาษ อู้อี้ ซาวด์เอนจิเนียร์มักคัตย่านนี้ลงเพื่อความสะอาด";
-        if (freq <= 1500) return "ย่าน Mid & Nasal เสียงก้องขึ้นจมูก ชัดเจนแบบลำโพงโทรศัพท์หรือโทรโข่ง";
-        if (freq <= 4000) return "ย่าน Presence & Attack ความคมชัด หัวไม้กลอง การดีดสายกีตาร์ และความชัดเจนของคำร้อง";
-        if (freq <= 8000) return "ย่าน Sibilance & Harshness เสียงลมพ่นฟัน ส, ซ และความคมบาดหู";
-        return "ย่าน Air & Shimmer ประกายความหรูหรา ความโปร่ง และบรรยากาศของสตูดิโอระดับโลก";
-    }
 
     // -------------------------------------------------------------
     // INITIAL BOOTSTRAP

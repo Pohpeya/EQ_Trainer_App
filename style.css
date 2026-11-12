@@ -1166,6 +1166,13 @@ main.app-main {
     line-height: 1.45;
 }
 
+.guide-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
 .panel-badge {
     font-family: var(--font-mono);
     background: rgba(0, 210, 255, 0.12);
@@ -1178,8 +1185,110 @@ main.app-main {
     white-space: nowrap;
 }
 
-.zones-guide-hint {
+.btn-zone-expand {
+    background: #19202f;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: var(--text-secondary);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.15s;
+}
+
+.btn-zone-expand:hover {
+    background: #232c40;
+    color: #ffffff;
+    border-color: var(--accent-cyan);
+}
+
+/* =========================================================
+   7. INTERACTIVE FREQUENCY SPECTRUM STRIP & ACCORDION CARDS
+   ========================================================= */
+.zones-spectrum-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    background: #0f131d;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border-subtle);
+}
+
+.zones-spectrum-label {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    color: var(--text-muted);
+    font-weight: 700;
+    letter-spacing: 0.3px;
+}
+
+.zones-spectrum-track {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 3px;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+}
+
+.spectrum-chip {
+    background: #171d2b;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+    padding: 5px 9px;
+    border-radius: 5px;
+    font-family: var(--font-ui);
     font-size: 11.5px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+}
+
+.spectrum-chip:hover {
+    background: #222b3e;
+    color: #ffffff;
+    border-color: var(--chip-color, var(--accent-cyan));
+}
+
+.spectrum-chip.active {
+    background: rgba(0, 210, 255, 0.16);
+    border-color: var(--chip-color, var(--accent-cyan));
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(0, 210, 255, 0.3);
+}
+
+.spectrum-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.spectrum-freq {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.spectrum-name {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.zones-guide-hint {
+    font-size: 11px;
     color: #b8d4f2;
     background: rgba(0, 210, 255, 0.07);
     border: 1px solid rgba(0, 210, 255, 0.2);
@@ -1187,275 +1296,290 @@ main.app-main {
     border-radius: 6px;
 }
 
-/* Sweet-Spot Zone Cards */
+/* Sweet-Spot Interactive Zone Cards */
 .zones-list {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    max-height: 515px;
+    gap: 8px;
+    max-height: 520px;
     overflow-y: auto;
     padding-right: 4px;
     scrollbar-width: thin;
 }
 
 .zone-card {
-    background: #1a202f;
+    background: #141824;
     border: 1px solid rgba(255, 255, 255, 0.08);
-    border-left: 4px solid var(--accent-cyan);
-    border-radius: 7px;
-    padding: 11px 12px;
-    cursor: pointer;
-    transition: all 0.15s ease;
+    border-radius: 8px;
+    transition: all 0.18s ease;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
-    gap: 8px;
 }
 
 .zone-card:hover {
-    background: #222a3e;
-    border-color: var(--zone-color, var(--accent-cyan));
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    background: #192030;
+    border-color: rgba(255, 255, 255, 0.18);
 }
 
+.zone-card.is-expanded {
+    border-color: var(--zone-color, var(--accent-cyan));
+    background: #151a28;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+}
+
+/* Zone Card Header (Compact 1-row summary) */
 .zone-header {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    gap: 8px;
+    justify-content: space-between;
+    padding: 8px 12px;
+    cursor: pointer;
+    gap: 10px;
+    user-select: none;
+    transition: background 0.15s;
+}
+
+.zone-header:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.zone-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+}
+
+.zone-color-bar {
+    width: 3.5px;
+    height: 32px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.zone-freq-cluster {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.zone-center-pill {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    font-weight: 800;
+    background: #0d1017;
+    border: 1px solid currentColor;
+    padding: 1px 6px;
+    border-radius: 4px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.zone-range-text {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.zone-title-block {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
 }
 
 .zone-title {
     font-size: 13px;
     font-weight: 700;
-}
-
-.zone-freq-badge {
-    font-family: var(--font-mono);
-    background: #0d1018;
-    font-size: 10.5px;
-    font-weight: 700;
-    padding: 2px 7px;
-    border-radius: 4px;
-    color: var(--accent-gold);
-    border: 1px solid rgba(255, 214, 10, 0.3);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.zone-body {
-    font-size: 12px;
-    color: #d5deec;
-    line-height: 1.5;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-}
-
-.zone-item {
-    display: flex;
-    align-items: baseline;
-    gap: 6px;
-}
-
-.zone-tag {
-    font-size: 10.5px;
-    font-weight: 700;
-    padding: 1px 6px;
-    border-radius: 3px;
+.zone-teaser {
+    font-size: 11px;
+    color: var(--text-secondary);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.zone-header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     flex-shrink: 0;
 }
 
-.tag-ideal {
-    background: rgba(48, 209, 88, 0.15);
+.quick-audition-group {
+    display: flex;
+    gap: 4px;
+}
+
+.quick-aud-btn {
+    background: #1c2333;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 4px 7px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.quick-aud-btn:hover {
+    background: #273148;
+    color: #ffffff;
+}
+
+.quick-aud-btn.btn-boost.active {
+    background: rgba(0, 210, 255, 0.28);
+    border-color: var(--accent-cyan);
+    color: #ffffff;
+    box-shadow: 0 0 8px rgba(0, 210, 255, 0.45);
+}
+
+.quick-aud-btn.btn-cut.active {
+    background: rgba(255, 69, 58, 0.28);
+    border-color: var(--accent-red);
+    color: #ffffff;
+    box-shadow: 0 0 8px rgba(255, 69, 58, 0.45);
+}
+
+.zone-chevron {
+    font-size: 11px;
+    color: var(--text-muted);
+    width: 16px;
+    text-align: center;
+}
+
+/* Zone Drawer (Expanded View with Full Details) */
+.zone-drawer {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 12px 12px 12px;
+    background: rgba(10, 13, 20, 0.6);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.zone-spec-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.zone-spec-card {
+    background: #161b28;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.zone-spec-card.spec-ideal {
+    border-left: 3px solid var(--accent-green);
+}
+
+.zone-spec-card.spec-boost {
+    border-left: 3px solid var(--accent-orange);
+}
+
+.zone-spec-card.spec-cut {
+    border-left: 3px solid var(--accent-cyan);
+}
+
+.zone-spec-card.spec-protip {
+    border-left: 3px solid var(--accent-gold);
+    grid-column: 1 / -1;
+    background: rgba(255, 214, 10, 0.05);
+}
+
+.spec-label {
+    font-size: 10.5px;
+    font-weight: 700;
+}
+
+.spec-ideal .spec-label {
     color: #5ce67e;
 }
 
-.tag-boost {
-    background: rgba(255, 159, 10, 0.15);
+.spec-boost .spec-label {
     color: #ffb340;
 }
 
-.tag-cut {
-    background: rgba(0, 210, 255, 0.14);
+.spec-cut .spec-label {
     color: #5cd6ff;
 }
 
-.zone-protip {
-    margin-top: 2px;
-    background: rgba(255, 214, 10, 0.07);
-    border-left: 2px solid var(--accent-gold);
-    padding: 5px 8px;
-    border-radius: 4px;
-    font-size: 11px;
-    color: #f5e29c;
+.spec-protip .spec-label {
+    color: var(--accent-gold);
 }
 
-.zone-actions-row {
+.spec-desc {
+    font-size: 12.5px;
+    color: #e2e8f0;
+    line-height: 1.5;
+}
+
+/* Detailed Audition Bar inside Drawer */
+.zone-audition-bar {
     display: flex;
     gap: 6px;
     margin-top: 2px;
 }
 
-.zone-act-btn {
+.zone-aud-btn {
     flex: 1;
-    background: #121622;
+    background: #1a2131;
     border: 1px solid rgba(255, 255, 255, 0.1);
     color: var(--text-primary);
-    padding: 5px 8px;
-    border-radius: 5px;
-    font-family: var(--font-ui);
-    font-size: 11px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.15s;
-}
-
-.zone-act-btn.boost-act:hover {
-    background: rgba(0, 210, 255, 0.2);
-    border-color: var(--accent-cyan);
-    color: #ffffff;
-}
-
-.zone-act-btn.cut-act:hover {
-    background: rgba(255, 69, 58, 0.2);
-    border-color: var(--accent-red);
-    color: #ffffff;
-}
-
-/* =========================================================
-   8. EAR TRAINING QUIZ PANEL
-   ========================================================= */
-.quiz-dashboard {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.quiz-stats-bar {
-    display: flex;
-    background: #111520;
-    border: 1px solid var(--border-color);
-    padding: 10px 14px;
-    border-radius: 7px;
-    justify-content: space-around;
-}
-
-.stat-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-.stat-item .stat-label {
-    font-family: var(--font-mono);
-    font-size: 10px;
-    color: var(--text-muted);
-}
-
-.stat-item .stat-value {
-    font-family: var(--font-mono);
-    font-size: 17px;
-    font-weight: 800;
-    color: #ffffff;
-}
-
-.quiz-setup-box {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    background: #1a202f;
-    border: 1px solid var(--border-color);
-    padding: 14px;
-    border-radius: 7px;
-}
-
-.quiz-difficulty-picker {
-    display: flex;
-    gap: 6px;
-}
-
-.diff-btn {
-    flex: 1;
-    background: #111520;
-    border: 1px solid var(--border-color);
-    color: var(--text-secondary);
-    padding: 7px 6px;
+    padding: 7px 10px;
     border-radius: 5px;
     font-family: var(--font-ui);
     font-size: 11.5px;
     font-weight: 600;
     cursor: pointer;
-}
-
-.diff-btn.active {
-    background: rgba(191, 90, 242, 0.22);
-    border-color: var(--accent-purple);
-    color: #ffffff;
-}
-
-.quiz-active-area {
     display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.quiz-action-bar {
-    display: flex;
-    gap: 8px;
-}
-
-.quiz-choices-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-    gap: 8px;
-}
-
-.quiz-choice-btn {
-    background: #1a202f;
-    border: 1px solid var(--border-color);
-    color: var(--text-primary);
-    padding: 10px 8px;
-    border-radius: 6px;
-    font-family: var(--font-ui);
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 3px;
+    justify-content: center;
+    gap: 5px;
     transition: all 0.15s;
 }
 
-.quiz-choice-btn:hover:not(:disabled) {
-    background: #252e44;
+.zone-aud-btn:hover {
+    background: #252f46;
+    border-color: rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+}
+
+.zone-aud-btn.aud-boost.active {
+    background: rgba(0, 210, 255, 0.28);
     border-color: var(--accent-cyan);
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(0, 210, 255, 0.4);
 }
 
-.quiz-choice-sub {
-    font-size: 10px;
-    color: var(--text-secondary);
-    font-weight: 400;
+.zone-aud-btn.aud-cut.active {
+    background: rgba(255, 69, 58, 0.28);
+    border-color: var(--accent-red);
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(255, 69, 58, 0.4);
 }
 
-.quiz-feedback-box {
-    padding: 11px;
-    border-radius: 6px;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-}
-
-.quiz-feedback-box.correct {
-    background: rgba(48, 209, 88, 0.15);
-    border: 1px solid var(--accent-green);
-    color: #88ffad;
-}
-
-.quiz-feedback-box.incorrect {
-    background: rgba(255, 69, 58, 0.15);
-    border: 1px solid var(--accent-red);
-    color: #ff9b94;
+.zone-aud-btn.aud-flat:hover {
+    border-color: var(--accent-gold);
+    color: var(--accent-gold);
 }
 
 /* =========================================================
@@ -1513,4 +1637,569 @@ main.app-main {
 .drop-overlay-sub {
     font-size: 13px;
     color: var(--accent-cyan);
+}
+
+/* =========================================================
+   10. MULTI-DEVICE RESPONSIVE DESIGN
+   (Computer Desktop, Mobile Portrait แนวตั้ง & Mobile Landscape แนวนอน)
+   ========================================================= */
+
+/* Mobile Quick-Switch Bottom Bar (Hidden on Desktop by default) */
+.mobile-bottom-nav {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: rgba(13, 16, 24, 0.96);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid rgba(255, 255, 255, 0.14);
+    z-index: 900;
+    grid-template-columns: repeat(3, 1fr);
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.65);
+}
+
+.mob-nav-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 600;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border-top: 2px solid transparent;
+}
+
+.mob-nav-btn.active {
+    color: var(--accent-cyan);
+    background: rgba(0, 210, 255, 0.08);
+    border-top-color: var(--accent-cyan);
+}
+
+/* Touch Action & Smooth Scrolling Improvements */
+#eqCanvas,
+.rotary-knob-Interactive,
+.graphic-v-slider {
+    touch-action: none;
+}
+
+.instruments-bar,
+.presets-chips-wrap,
+.filter-shape-pills,
+.zones-spectrum-track {
+    -webkit-overflow-scrolling: touch;
+}
+
+/* ---------------------------------------------------------
+   A. TABLET & MOBILE PORTRAIT (แนวตั้ง: <= 900px)
+   --------------------------------------------------------- */
+@media (max-width: 900px) {
+    body {
+        padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .mobile-bottom-nav {
+        display: grid;
+    }
+
+    /* Mobile View Filter Classes controlled by #mobileBottomNav */
+    main.app-main.mob-view-eq .inspector-dock-pane {
+        display: none !important;
+    }
+
+    main.app-main.mob-view-guide .plugin-unit-pane {
+        display: none !important;
+    }
+
+    /* Tone Guide in Mobile View */
+    main.app-main.mob-view-guide .inspector-dock-pane {
+        width: 100% !important;
+        max-height: none !important;
+        padding: 12px;
+    }
+
+    .inspector-dock-pane {
+        max-height: none;
+    }
+
+    .zones-list {
+        max-height: none;
+        overflow-y: visible;
+    }
+
+    /* Mobile Portrait Typography & High-Readability Overhaul */
+    .zone-header {
+        padding: 9px 10px;
+    }
+
+    .zone-title {
+        font-size: 13.5px;
+    }
+
+    .zone-teaser {
+        font-size: 11.5px;
+        color: #b8c4d8;
+    }
+
+    .zone-drawer {
+        padding: 10px 10px 14px 10px;
+    }
+
+    /* Full-width 1-column specification cards so text breathes and is easy to read */
+    .zone-spec-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .zone-spec-card {
+        padding: 10px 12px;
+        border-radius: 7px;
+        background: #171d2b;
+    }
+
+    .spec-label {
+        font-size: 11.5px;
+        margin-bottom: 2px;
+    }
+
+    .spec-desc {
+        font-size: 13.5px;
+        line-height: 1.6;
+        color: #f1f5f9;
+        font-weight: 400;
+    }
+
+    .zone-audition-bar {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+    }
+
+    .zone-aud-btn {
+        padding: 10px 8px;
+        font-size: 12px;
+        min-height: 40px;
+    }
+
+    .zone-aud-btn.aud-flat {
+        grid-column: 1 / -1;
+    }
+
+    .quick-aud-btn {
+        padding: 5px 8px;
+        font-size: 11px;
+        min-height: 32px;
+    }
+
+    header.app-header {
+        padding: 8px 12px;
+        gap: 8px;
+    }
+
+    .brand .subtitle {
+        display: none;
+    }
+
+    .brand h1 {
+        font-size: 14px;
+    }
+
+    .header-controls {
+        width: 100%;
+        justify-content: space-between;
+        gap: 5px;
+    }
+
+    .header-divider {
+        display: none;
+    }
+
+    .btn {
+        padding: 6px 10px;
+        font-size: 11.5px;
+        flex: 1 1 auto;
+        justify-content: center;
+    }
+
+    .volume-control {
+        flex: 1 1 100%;
+        justify-content: space-between;
+        padding: 5px 10px;
+    }
+
+    .volume-slider {
+        flex: 1;
+        max-width: 180px;
+    }
+
+    /* Swipeable Instrument Channel Strip */
+    .instruments-bar {
+        padding: 6px 10px;
+        gap: 6px;
+    }
+
+    .instrument-pill {
+        padding: 6px 12px;
+        font-size: 11.5px;
+    }
+
+    main.app-main {
+        grid-template-columns: 1fr;
+        padding: 8px;
+        gap: 10px;
+    }
+
+    .plugin-unit-pane {
+        padding: 8px;
+        gap: 8px;
+    }
+
+    .eq-mode-bar {
+        padding: 6px 8px;
+        gap: 6px;
+    }
+
+    .mode-switch-group {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .mode-switch-btn {
+        justify-content: center;
+        font-size: 11.5px;
+        padding: 6px 8px;
+    }
+
+    .presets-inline-bar {
+        width: 100%;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        padding-bottom: 2px;
+    }
+
+    .presets-chips-wrap {
+        flex-wrap: nowrap;
+    }
+
+    .preset-chip {
+        white-space: nowrap;
+        padding: 4px 10px;
+    }
+
+    /* Analyzer Stage Sizing for Portrait */
+    .analyzer-stage {
+        height: 265px;
+        grid-template-columns: 1fr 34px;
+        gap: 6px;
+    }
+
+    .eq-screen-header {
+        top: 28px;
+        left: 8px;
+        right: 38px;
+    }
+
+    .eq-screen-header > span {
+        display: none;
+    }
+
+    .canvas-hint {
+        font-size: 9.5px;
+        bottom: 22px;
+        left: 8px;
+        right: 8px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* 8-Band Cards: 4x2 Touch Grid */
+    .band-selector-tabs {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 5px;
+    }
+
+    .band-tab-btn {
+        padding: 5px 6px;
+    }
+
+    /* Selected Band Controls & 3 Rotary Knobs side-by-side */
+    .band-controls-group {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 10px;
+        gap: 12px;
+    }
+
+    .band-shape-deck {
+        width: 100%;
+    }
+
+    .selected-band-header {
+        justify-content: space-between;
+    }
+
+    .filter-shape-pills {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 4px;
+    }
+
+    .shape-pill {
+        flex-direction: column;
+        justify-content: center;
+        padding: 5px 2px;
+        font-size: 9.5px;
+        gap: 3px;
+    }
+
+    .rotary-knobs-cluster {
+        width: 100%;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        justify-items: center;
+    }
+
+    .rotary-knob-Interactive {
+        width: 60px;
+        height: 60px;
+    }
+
+    .knob-svg {
+        width: 60px;
+        height: 60px;
+    }
+
+    .knob-cap {
+        width: 38px;
+        height: 38px;
+    }
+
+    .param-knob-box .param-value {
+        font-size: 11px;
+        min-width: 72px;
+        padding: 2px 5px;
+    }
+
+    .param-slider {
+        width: 82px;
+    }
+
+    /* 10-Band Graphic EQ Touch Scroll */
+    .graphic-faders-container {
+        overflow-x: auto;
+        grid-template-columns: repeat(10, minmax(52px, 1fr));
+        gap: 6px;
+    }
+}
+
+/* Small Phone Portrait (<= 480px) */
+@media (max-width: 480px) {
+    .analyzer-stage {
+        height: 235px;
+        grid-template-columns: 1fr 30px;
+    }
+
+    .legend-item {
+        display: none;
+    }
+
+    .cursor-readout {
+        font-size: 9.5px;
+        min-width: 120px;
+    }
+
+    .param-slider {
+        width: 72px;
+    }
+}
+
+/* ---------------------------------------------------------
+   B. MOBILE & TABLET LANDSCAPE (แนวนอน: ความสูงไม่เกิน 560px)
+   ออกแบบให้วางคู่มือ/ควิซคู่กับหน้าจอ EQ แบบ 2 คอลัมน์พอดีจอแนวนอน
+   --------------------------------------------------------- */
+@media (max-height: 560px) and (orientation: landscape) {
+    body {
+        padding-bottom: 0;
+    }
+
+    .mobile-bottom-nav {
+        display: none !important;
+    }
+
+    /* Ensure both panes remain visible in landscape split view */
+    main.app-main.mob-view-eq .inspector-dock-pane,
+    main.app-main.mob-view-guide .plugin-unit-pane {
+        display: flex !important;
+    }
+
+    header.app-header {
+        padding: 4px 12px;
+        gap: 6px;
+    }
+
+    .brand .subtitle {
+        display: none;
+    }
+
+    .brand h1 {
+        font-size: 13.5px;
+    }
+
+    .header-controls {
+        width: auto;
+        gap: 4px;
+    }
+
+    .btn {
+        padding: 4px 8px;
+        font-size: 11px;
+        flex: 0 0 auto;
+    }
+
+    .volume-control {
+        flex: 0 0 auto;
+        padding: 2px 8px;
+    }
+
+    .volume-slider {
+        width: 55px;
+    }
+
+    .instruments-bar {
+        padding: 4px 12px;
+        gap: 5px;
+    }
+
+    .instrument-pill {
+        padding: 3px 9px;
+        font-size: 11px;
+    }
+
+    /* Side-by-Side 2-Column Split on Landscape Phone */
+    main.app-main {
+        grid-template-columns: minmax(0, 1.38fr) minmax(260px, 0.92fr);
+        gap: 8px;
+        padding: 6px 10px;
+    }
+
+    .plugin-unit-pane {
+        padding: 8px;
+        gap: 6px;
+    }
+
+    .eq-mode-bar {
+        padding: 4px 8px;
+    }
+
+    .mode-switch-group {
+        width: auto;
+        display: inline-flex;
+    }
+
+    .analyzer-stage {
+        height: 195px;
+        grid-template-columns: 1fr 32px;
+    }
+
+    .canvas-hint {
+        display: none;
+    }
+
+    .band-rack {
+        padding: 6px 8px;
+        gap: 6px;
+    }
+
+    .band-selector-tabs {
+        grid-template-columns: repeat(8, 1fr);
+        gap: 4px;
+    }
+
+    .band-tab-btn {
+        padding: 4px;
+    }
+
+    .band-card-freq {
+        font-size: 9.5px;
+    }
+
+    .band-card-gain {
+        font-size: 9px;
+    }
+
+    .band-controls-group {
+        flex-direction: row;
+        padding: 6px 10px;
+        gap: 8px;
+    }
+
+    .band-shape-deck {
+        width: auto;
+        gap: 4px;
+    }
+
+    .filter-shape-pills {
+        display: flex;
+        gap: 4px;
+    }
+
+    .shape-pill {
+        flex-direction: row;
+        padding: 3px 6px;
+        font-size: 9.5px;
+    }
+
+    .rotary-knobs-cluster {
+        width: auto;
+        display: flex;
+        gap: 14px;
+    }
+
+    .rotary-knob-Interactive {
+        width: 50px;
+        height: 50px;
+    }
+
+    .knob-svg {
+        width: 50px;
+        height: 50px;
+    }
+
+    .knob-cap {
+        width: 32px;
+        height: 32px;
+    }
+
+    .knob-indicator {
+        height: 9px;
+        margin-top: 3px;
+    }
+
+    .param-knob-box .param-value {
+        font-size: 10px;
+        min-width: 64px;
+    }
+
+    .param-slider {
+        width: 68px;
+    }
+
+    .inspector-dock-pane {
+        max-height: calc(100vh - 82px);
+    }
+
+    .zones-list {
+        max-height: calc(100vh - 210px);
+    }
 }

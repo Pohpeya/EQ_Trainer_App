@@ -1,6 +1,6 @@
 /**
  * PRO-EQ Studio Trainer - Interactive Parametric & Graphic EQ Visualizer
- * Inspired by FabFilter Pro-Q 3, Logic Pro Channel EQ, Ableton EQ Eight & Kirchhoff-EQ
+ * Responsive for Desktop, Mobile Portrait & Mobile Landscape with Full Multi-Touch Support
  */
 
 const BAND_COLORS = [
@@ -26,8 +26,8 @@ class EQCanvas {
 
         this.width = canvas.width;
         this.height = canvas.height;
-        this.paddingTop = 48;    // Space for acoustic sub-band bar + instrument sweet-spot pills
-        this.paddingBottom = 26; // Space for frequency axis labels
+        this.paddingTop = 44;
+        this.paddingBottom = 24;
 
         this.minFreq = 20;
         this.maxFreq = 20000;
@@ -39,6 +39,12 @@ class EQCanvas {
         this.isDragging = false;
         this.dragStartX = 0;
         this.dragStartY = 0;
+
+        // Touch gestures state (double-tap & 2-finger pinch for Q)
+        this.lastTapTime = 0;
+        this.lastTapBand = null;
+        this.initialPinchDist = null;
+        this.initialPinchQ = 1.4;
 
         // Graphic EQ drag state
         this.selectedGraphicBand = null;
@@ -82,15 +88,20 @@ class EQCanvas {
     resize() {
         const rect = this.canvas.getBoundingClientRect();
         if (rect.width === 0 || rect.height === 0) return;
-        const dpr = window.devicePixelRatio || 1;
-        this.canvas.width = rect.width * dpr;
-        this.canvas.height = rect.height * dpr;
+        const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+        this.canvas.width = Math.round(rect.width * dpr);
+        this.canvas.height = Math.round(rect.height * dpr);
         this.width = this.canvas.width;
         this.height = this.canvas.height;
         this.ctx.setTransform(1, 0, 0, 1, 0, 0);
         this.ctx.scale(dpr, dpr);
         this.displayWidth = rect.width;
         this.displayHeight = rect.height;
+
+        // Adjust top/bottom padding compactly on smaller mobile screens
+        const isCompact = (rect.height < 250 || rect.width < 520);
+        this.paddingTop = isCompact ? 38 : 46;
+        this.paddingBottom = isCompact ? 20 : 25;
     }
 
     setActiveZones(zones) {
@@ -148,12 +159,23 @@ class EQCanvas {
     }
 
     // -------------------------------------------------------------
-    // EVENT HANDLING (DRAG, HOVER, WHEEL FOR Q, CROSSHAIR)
+    // EVENT HANDLING (MOUSE + MOBILE TOUCH + ORIENTATION RESIZE)
     // -------------------------------------------------------------
     initEvents() {
         window.addEventListener("resize", () => this.resize());
+        window.addEventListener("orientationchange", () => {
+            setTimeout(() => this.resize(), 120);
+            setTimeout(() => this.resize(), 350);
+        });
 
-        this.canvas.addEventListener("mousedown", (e) => this.handleMouseDown(e));
+        // Observe wrapper size changes (e.g. layout shifts or tab switches)
+        if (typeof ResizeObserver !== "undefined" && this.canvas.parentElement) {
+            const ro = new ResizeObserver(() => this.resize());
+            ro.observe(this.canvas.parentElement);
+        }
+
+        // Mouse Events
+        this.canvas.addEventListener("mousedown", (e) => this.handleMouseDown(e, false));
         window.addEventListener("mousemove", (e) => this.handleMouseMove(e));
         window.addEventListener("mouseup", () => this.handleMouseUp());
         this.canvas.addEventListener("mouseleave", () => {
@@ -164,23 +186,57 @@ class EQCanvas {
         this.canvas.addEventListener("wheel", (e) => this.handleWheel(e), { passive: false });
         this.canvas.addEventListener("dblclick", (e) => this.handleDblClick(e));
 
-        // Touch support
+        // Mobile Touch Events (1-finger drag, double-tap reset, 2-finger pinch Q)
         this.canvas.addEventListener("touchstart", (e) => {
+            if (e.touches.length === 2 && this.audio.eqMode === "parametric") {
+                // 2-finger pinch to adjust Q bandwidth on mobile
+                e.preventDefault();
+                this.isDragging = false;
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                this.initialPinchDist = Math.hypot(dx, dy);
+                const targetIdx = this.selectedBand !== null ? this.selectedBand : 2;
+                this.initialPinchQ = this.audio.bands[targetIdx].q;
+                return;
+            }
+
             if (e.touches.length === 1) {
                 const touch = e.touches[0];
-                const rect = this.canvas.getBoundingClientRect();
-                this.handleMouseDown({ clientX: touch.clientX, clientY: touch.clientY, rect });
+                const mouseEvent = { clientX: touch.clientX, clientY: touch.clientY };
+                const handled = this.handleMouseDown(mouseEvent, true);
+                if (handled) {
+                    e.preventDefault(); // Prevent page scrolling while dragging an EQ node
+                }
             }
         }, { passive: false });
 
         window.addEventListener("touchmove", (e) => {
+            if (e.touches.length === 2 && this.initialPinchDist && this.audio.eqMode === "parametric") {
+                e.preventDefault();
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                const dist = Math.hypot(dx, dy);
+                const scale = this.initialPinchDist / Math.max(20, dist);
+                const targetIdx = this.selectedBand !== null ? this.selectedBand : 2;
+                const newQ = Math.max(0.2, Math.min(10, this.initialPinchQ * scale));
+                this.audio.updateBand(targetIdx, { q: Math.round(newQ * 100) / 100 });
+                if (this.onBandChange) {
+                    this.onBandChange(targetIdx, this.audio.bands[targetIdx]);
+                }
+                return;
+            }
+
             if ((this.isDragging || this.isDraggingGraphic) && e.touches.length === 1) {
+                e.preventDefault();
                 const touch = e.touches[0];
                 this.handleMouseMove({ clientX: touch.clientX, clientY: touch.clientY });
             }
         }, { passive: false });
 
-        window.addEventListener("touchend", () => this.handleMouseUp());
+        window.addEventListener("touchend", () => {
+            this.initialPinchDist = null;
+            this.handleMouseUp();
+        });
     }
 
     getCanvasPos(e) {
@@ -191,25 +247,28 @@ class EQCanvas {
         };
     }
 
-    findBandUnderPointer(pos) {
-        const radius = 16;
+    findBandUnderPointer(pos, isTouch = false) {
+        const radius = isTouch ? 28 : 16; // Larger hit target for mobile touch
+        let closestIdx = null;
+        let minDist = radius;
         for (let i = 0; i < this.audio.bands.length; i++) {
             const b = this.audio.bands[i];
             const bx = this.freqToX(b.freq);
             const by = this.dbToY(b.gain);
             const dist = Math.hypot(pos.x - bx, pos.y - by);
-            if (dist <= radius) {
-                return i;
+            if (dist <= minDist) {
+                minDist = dist;
+                closestIdx = i;
             }
         }
-        return null;
+        return closestIdx;
     }
 
-    handleMouseDown(e) {
+    handleMouseDown(e, isTouch = false) {
         const pos = this.getCanvasPos(e);
 
-        // Check if clicked in top sweet-spot zone bar (20px - 46px)
-        if (pos.y >= 18 && pos.y <= 46 && this.activeZones && this.activeZones.length > 0) {
+        // Check if clicked in top sweet-spot zone bar
+        if (pos.y >= 16 && pos.y <= this.paddingTop && this.activeZones && this.activeZones.length > 0) {
             for (let zone of this.activeZones) {
                 const parsed = this.parseZoneRange(zone.range);
                 if (parsed) {
@@ -218,7 +277,7 @@ class EQCanvas {
                     if (pos.x >= x1 && pos.x <= x2) {
                         if (this.onZoneClick) {
                             this.onZoneClick(zone);
-                            return;
+                            return true;
                         }
                     }
                 }
@@ -228,28 +287,44 @@ class EQCanvas {
         // Check if in Graphic EQ mode
         if (this.audio.eqMode === "graphic") {
             const freqs = this.audio.graphicFreqs;
+            const hitWidth = isTouch ? 30 : 24;
             for (let i = 0; i < freqs.length; i++) {
                 const bx = this.freqToX(freqs[i]);
-                if (Math.abs(pos.x - bx) <= 24) {
+                if (Math.abs(pos.x - bx) <= hitWidth) {
                     this.selectedGraphicBand = i;
                     this.isDraggingGraphic = true;
                     const newGain = Math.max(-12, Math.min(12, this.yToDb(pos.y)));
                     this.audio.setGraphicGain(i, newGain);
                     if (this.onGraphicChange) this.onGraphicChange(i, newGain);
-                    return;
+                    return true;
                 }
             }
-            return;
+            return false;
         }
 
-        const bandIdx = this.findBandUnderPointer(pos);
+        const bandIdx = this.findBandUnderPointer(pos, isTouch);
         if (bandIdx !== null) {
+            const now = Date.now();
+            // Double-tap on mobile resets gain to 0 dB
+            if (isTouch && this.lastTapBand === bandIdx && (now - this.lastTapTime) < 320) {
+                this.audio.updateBand(bandIdx, { gain: 0 });
+                if (this.onBandChange) {
+                    this.onBandChange(bandIdx, this.audio.bands[bandIdx]);
+                }
+                this.lastTapTime = 0;
+                return true;
+            }
+            this.lastTapTime = now;
+            this.lastTapBand = bandIdx;
+
             this.selectedBand = bandIdx;
             this.isDragging = true;
             this.dragStartX = pos.x;
             this.dragStartY = pos.y;
             if (this.onNodeSelect) this.onNodeSelect(bandIdx);
+            return true;
         }
+        return false;
     }
 
     handleMouseMove(e) {
@@ -303,9 +378,9 @@ class EQCanvas {
                 this.onBandChange(this.selectedBand, this.audio.bands[this.selectedBand]);
             }
         } else if (isInside) {
-            const hovered = this.findBandUnderPointer(pos);
+            const hovered = this.findBandUnderPointer(pos, false);
             this.hoveredBand = hovered;
-            if (pos.y >= 18 && pos.y <= 46) {
+            if (pos.y >= 16 && pos.y <= this.paddingTop) {
                 this.canvas.style.cursor = "pointer";
             } else {
                 this.canvas.style.cursor = (hovered !== null) ? "grab" : "crosshair";
@@ -323,7 +398,6 @@ class EQCanvas {
     }
 
     handleWheel(e) {
-        const pos = this.getCanvasPos(e);
         const targetBand = (this.hoveredBand !== null) ? this.hoveredBand : this.selectedBand;
         if (targetBand !== null && this.audio.eqMode === "parametric") {
             e.preventDefault();
@@ -352,7 +426,7 @@ class EQCanvas {
             return;
         }
 
-        const bandIdx = this.findBandUnderPointer(pos);
+        const bandIdx = this.findBandUnderPointer(pos, false);
         if (bandIdx !== null) {
             this.audio.updateBand(bandIdx, { gain: 0 });
             if (this.onBandChange) {
@@ -410,44 +484,45 @@ class EQCanvas {
     // -------------------------------------------------------------
     drawGrid(ctx, w, h) {
         ctx.save();
+        const isNarrow = (w < 540);
 
-        // Top Acoustic Sub-Bands Reference Bar (0 to 20px)
+        // Top Acoustic Sub-Bands Reference Bar
         const acousticBands = [
-            { name: "SUB BASS", f1: 20, f2: 60, color: "rgba(255, 69, 58, 0.08)" },
+            { name: isNarrow ? "SUB" : "SUB BASS", f1: 20, f2: 60, color: "rgba(255, 69, 58, 0.08)" },
             { name: "BASS", f1: 60, f2: 250, color: "rgba(255, 159, 10, 0.08)" },
-            { name: "LOW MID", f1: 250, f2: 500, color: "rgba(255, 214, 10, 0.07)" },
-            { name: "MIDRANGE", f1: 500, f2: 2000, color: "rgba(48, 209, 88, 0.07)" },
-            { name: "UPPER MID", f1: 2000, f2: 4000, color: "rgba(0, 210, 255, 0.08)" },
-            { name: "PRESENCE", f1: 4000, f2: 6000, color: "rgba(94, 92, 230, 0.08)" },
-            { name: "BRILLIANCE / AIR", f1: 6000, f2: 20000, color: "rgba(191, 90, 242, 0.08)" }
+            { name: isNarrow ? "L-MID" : "LOW MID", f1: 250, f2: 500, color: "rgba(255, 214, 10, 0.07)" },
+            { name: isNarrow ? "MID" : "MIDRANGE", f1: 500, f2: 2000, color: "rgba(48, 209, 88, 0.07)" },
+            { name: isNarrow ? "H-MID" : "UPPER MID", f1: 2000, f2: 4000, color: "rgba(0, 210, 255, 0.08)" },
+            { name: isNarrow ? "PRES" : "PRESENCE", f1: 4000, f2: 6000, color: "rgba(94, 92, 230, 0.08)" },
+            { name: isNarrow ? "AIR" : "BRILLIANCE / AIR", f1: 6000, f2: 20000, color: "rgba(191, 90, 242, 0.08)" }
         ];
 
+        const barH = isNarrow ? 16 : 19;
         acousticBands.forEach(ab => {
             const x1 = this.freqToX(ab.f1);
             const x2 = this.freqToX(ab.f2);
             ctx.fillStyle = ab.color;
-            ctx.fillRect(x1, 0, x2 - x1, 19);
+            ctx.fillRect(x1, 0, x2 - x1, barH);
 
             ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(x2, 0);
-            ctx.lineTo(x2, 19);
+            ctx.lineTo(x2, barH);
             ctx.stroke();
 
-            if (x2 - x1 > 42) {
-                ctx.fillStyle = "rgba(255, 255, 255, 0.42)";
-                ctx.font = "600 9px 'JetBrains Mono', monospace";
+            if (x2 - x1 > 26) {
+                ctx.fillStyle = "rgba(255, 255, 255, 0.45)";
+                ctx.font = `600 ${isNarrow ? 8 : 9}px 'JetBrains Mono', monospace`;
                 ctx.textAlign = "center";
-                ctx.fillText(ab.name, (x1 + x2) / 2, 13);
+                ctx.fillText(ab.name, (x1 + x2) / 2, isNarrow ? 11 : 13);
             }
         });
 
-        // Subtle divider below acoustic sub-bands
         ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
         ctx.beginPath();
-        ctx.moveTo(0, 19);
-        ctx.lineTo(w, 19);
+        ctx.moveTo(0, barH);
+        ctx.lineTo(w, barH);
         ctx.stroke();
 
         // Minor Logarithmic Vertical Lines
@@ -456,7 +531,7 @@ class EQCanvas {
             300, 400, 600, 700, 800, 900,
             3000, 4000, 6000, 7000, 8000, 9000
         ];
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.03)";
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.028)";
         ctx.lineWidth = 1;
         minorFreqs.forEach(f => {
             const x = Math.round(this.freqToX(f)) + 0.5;
@@ -483,17 +558,17 @@ class EQCanvas {
         majorFreqs.forEach(item => {
             const x = Math.round(this.freqToX(item.f)) + 0.5;
             const isDecade = (item.f === 100 || item.f === 1000 || item.f === 10000);
-            ctx.strokeStyle = isDecade ? "rgba(255, 255, 255, 0.11)" : "rgba(255, 255, 255, 0.06)";
+            ctx.strokeStyle = isDecade ? "rgba(255, 255, 255, 0.11)" : "rgba(255, 255, 255, 0.055)";
             ctx.beginPath();
             ctx.moveTo(x, this.paddingTop);
             ctx.lineTo(x, h - this.paddingBottom);
             ctx.stroke();
 
-            ctx.fillStyle = isDecade ? "rgba(255, 255, 255, 0.7)" : "rgba(255, 255, 255, 0.42)";
-            ctx.font = isDecade ? "600 10px 'JetBrains Mono', monospace" : "400 10px 'JetBrains Mono', monospace";
+            ctx.fillStyle = isDecade ? "rgba(255, 255, 255, 0.72)" : "rgba(255, 255, 255, 0.42)";
+            ctx.font = `${isDecade ? 600 : 400} ${isNarrow ? 8.5 : 10}px 'JetBrains Mono', monospace`;
             ctx.textAlign = (item.f === 20) ? "left" : (item.f === 20000 ? "right" : "center");
-            const labelX = (item.f === 20) ? x + 4 : (item.f === 20000 ? x - 4 : x);
-            ctx.fillText(item.l, labelX, h - 8);
+            const labelX = (item.f === 20) ? x + 3 : (item.f === 20000 ? x - 3 : x);
+            ctx.fillText(item.l, labelX, h - (isNarrow ? 6 : 8));
         });
 
         // Horizontal dB Grid Lines
@@ -506,7 +581,7 @@ class EQCanvas {
         dbMarks.forEach(db => {
             const y = Math.round(this.dbToY(db)) + 0.5;
             const isZero = (db === 0);
-            ctx.strokeStyle = isZero ? "rgba(255, 255, 255, 0.28)" : "rgba(255, 255, 255, 0.055)";
+            ctx.strokeStyle = isZero ? "rgba(255, 255, 255, 0.28)" : "rgba(255, 255, 255, 0.05)";
             ctx.lineWidth = isZero ? 1.2 : 1;
 
             ctx.beginPath();
@@ -515,9 +590,9 @@ class EQCanvas {
             ctx.stroke();
 
             ctx.fillStyle = isZero ? "rgba(255, 255, 255, 0.85)" : "rgba(255, 255, 255, 0.35)";
-            ctx.font = "500 9.5px 'JetBrains Mono', monospace";
+            ctx.font = `500 ${isNarrow ? 8.5 : 9.5}px 'JetBrains Mono', monospace`;
             ctx.textAlign = "right";
-            ctx.fillText((db > 0 ? "+" : "") + db + " dB", w - 8, y - 4);
+            ctx.fillText((db > 0 ? "+" : "") + db + (isNarrow ? "" : " dB"), w - 6, y - 3);
         });
 
         ctx.restore();
@@ -537,7 +612,6 @@ class EQCanvas {
         const color = this.highlightedZone.color || "#00d2ff";
 
         ctx.save();
-        // Vertical glowing curtain
         const grad = ctx.createLinearGradient(0, this.paddingTop, 0, h - this.paddingBottom);
         grad.addColorStop(0, color + "33");
         grad.addColorStop(0.5, color + "18");
@@ -545,7 +619,6 @@ class EQCanvas {
         ctx.fillStyle = grad;
         ctx.fillRect(x1, this.paddingTop, zw, h - this.paddingTop - this.paddingBottom);
 
-        // Left & Right boundary dashed lines
         ctx.strokeStyle = color;
         ctx.lineWidth = 1.5;
         ctx.setLineDash([4, 4]);
@@ -557,23 +630,23 @@ class EQCanvas {
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // Spotlight Floating Banner
-        const cx = Math.max(90, Math.min(w - 90, (x1 + x2) / 2));
+        const label = `🎯 ${this.highlightedZone.name.split("(")[0].trim()} (${this.highlightedZone.range})`;
+        ctx.font = "600 10.5px 'Prompt', sans-serif";
+        const tw = Math.min(w - 24, ctx.measureText(label).width);
+        const cx = Math.max(tw / 2 + 12, Math.min(w - tw / 2 - 12, (x1 + x2) / 2));
+
         ctx.fillStyle = "rgba(10, 14, 22, 0.92)";
         ctx.strokeStyle = color;
         ctx.lineWidth = 1.2;
-        const label = `🎯 ${this.highlightedZone.name} (${this.highlightedZone.range})`;
-        ctx.font = "600 11px 'Prompt', sans-serif";
-        const tw = ctx.measureText(label).width;
         if (ctx.roundRect) {
             ctx.beginPath();
-            ctx.roundRect(cx - tw / 2 - 10, this.paddingTop + 10, tw + 20, 24, 6);
+            ctx.roundRect(cx - tw / 2 - 8, this.paddingTop + 8, tw + 16, 22, 5);
             ctx.fill();
             ctx.stroke();
         }
         ctx.fillStyle = "#ffffff";
         ctx.textAlign = "center";
-        ctx.fillText(label, cx, this.paddingTop + 26);
+        ctx.fillText(label, cx, this.paddingTop + 23);
 
         ctx.restore();
     }
@@ -584,6 +657,9 @@ class EQCanvas {
     drawZoneOverlay(ctx, w, h) {
         if (!this.activeZones || this.activeZones.length === 0) return;
         ctx.save();
+        const isNarrow = (w < 540);
+        const pillTop = isNarrow ? 18 : 22;
+        const pillH = isNarrow ? 17 : 20;
 
         this.activeZones.forEach(zone => {
             const parsed = this.parseZoneRange(zone.range);
@@ -595,36 +671,36 @@ class EQCanvas {
             const isHighlighted = (this.highlightedZone === zone);
             const color = zone.color || "#00d2ff";
 
-            // Pill Box in row y=22..42
             ctx.fillStyle = color;
-            ctx.globalAlpha = isHighlighted ? 0.35 : 0.16;
+            ctx.globalAlpha = isHighlighted ? 0.36 : 0.16;
             if (ctx.roundRect) {
                 ctx.beginPath();
-                ctx.roundRect(x1, 22, zoneWidth, 20, 4);
+                ctx.roundRect(x1, pillTop, zoneWidth, pillH, 4);
                 ctx.fill();
             } else {
-                ctx.fillRect(x1, 22, zoneWidth, 20);
+                ctx.fillRect(x1, pillTop, zoneWidth, pillH);
             }
 
             ctx.globalAlpha = isHighlighted ? 1.0 : 0.75;
             ctx.strokeStyle = color;
-            ctx.lineWidth = isHighlighted ? 1.8 : 1;
+            ctx.lineWidth = isHighlighted ? 1.6 : 1;
             if (ctx.roundRect) {
                 ctx.beginPath();
-                ctx.roundRect(x1, 22, zoneWidth, 20, 4);
+                ctx.roundRect(x1, pillTop, zoneWidth, pillH, 4);
                 ctx.stroke();
             }
 
-            if (zoneWidth > 38) {
+            if (zoneWidth > 32) {
                 ctx.globalAlpha = 0.95;
                 ctx.fillStyle = "#ffffff";
-                ctx.font = "600 9.5px 'Prompt', sans-serif";
+                ctx.font = `600 ${isNarrow ? 8.5 : 9.5}px 'Prompt', sans-serif`;
                 ctx.textAlign = "center";
                 let cleanName = zone.name.split("(")[0].trim();
-                if (zoneWidth < 80 && cleanName.length > 10) {
-                    cleanName = cleanName.substring(0, 9) + "…";
+                const maxChars = Math.max(4, Math.floor(zoneWidth / (isNarrow ? 6 : 7)));
+                if (cleanName.length > maxChars) {
+                    cleanName = cleanName.substring(0, maxChars - 1) + "…";
                 }
-                ctx.fillText(cleanName, (x1 + x2) / 2, 35);
+                ctx.fillText(cleanName, (x1 + x2) / 2, pillTop + (isNarrow ? 11.5 : 13.5));
             }
         });
 
@@ -650,7 +726,6 @@ class EQCanvas {
 
         ctx.save();
 
-        // Main RTA Fill Path
         ctx.beginPath();
         ctx.moveTo(0, bottomY);
 
@@ -663,12 +738,10 @@ class EQCanvas {
             const interp = exactBin - b0;
             const rawVal = ((dataArray[b0] * (1 - interp)) + (dataArray[b1] * interp)) / 255.0;
 
-            // Smooth attack/release
             this.spectrumPoints[i] = rawVal > this.spectrumPoints[i]
                 ? rawVal * 0.65 + this.spectrumPoints[i] * 0.35
                 : this.spectrumPoints[i] * 0.91;
 
-            // Peak hold with gentle decay
             if (this.spectrumPoints[i] >= this.peakHoldPoints[i]) {
                 this.peakHoldPoints[i] = this.spectrumPoints[i];
             } else {
@@ -683,7 +756,6 @@ class EQCanvas {
         ctx.lineTo(w, bottomY);
         ctx.closePath();
 
-        // Pro-Q 3 style analyzer gradient fill
         const grad = ctx.createLinearGradient(0, this.paddingTop, 0, bottomY);
         grad.addColorStop(0, "rgba(0, 210, 255, 0.32)");
         grad.addColorStop(0.55, "rgba(88, 86, 214, 0.16)");
@@ -691,7 +763,6 @@ class EQCanvas {
         ctx.fillStyle = grad;
         ctx.fill();
 
-        // Crisp top edge of RTA
         ctx.strokeStyle = "rgba(0, 220, 255, 0.62)";
         ctx.lineWidth = 1.4;
         ctx.stroke();
@@ -749,13 +820,11 @@ class EQCanvas {
                 else ctx.lineTo(x, y);
             }
 
-            // Stroke individual band curve
             ctx.strokeStyle = color;
             ctx.globalAlpha = isFocused ? 0.85 : 0.45;
             ctx.lineWidth = isFocused ? 1.8 : 1.1;
             ctx.stroke();
 
-            // Fill between curve and 0 dB line
             ctx.lineTo(w, zeroY);
             ctx.lineTo(0, zeroY);
             ctx.closePath();
@@ -861,6 +930,7 @@ class EQCanvas {
         const freqs = this.audio.graphicFreqs;
         const gains = this.audio.graphicGains;
         const zeroY = this.dbToY(0);
+        const isNarrow = (w < 540);
 
         ctx.save();
         for (let i = 0; i < freqs.length; i++) {
@@ -869,7 +939,6 @@ class EQCanvas {
             const x = this.freqToX(f);
             const y = this.dbToY(g);
 
-            // Vertical fader column line
             ctx.strokeStyle = "rgba(0, 210, 255, 0.15)";
             ctx.lineWidth = 1;
             ctx.setLineDash([2, 4]);
@@ -878,37 +947,36 @@ class EQCanvas {
             ctx.lineTo(x, h - this.paddingBottom);
             ctx.stroke();
 
-            // Glow bar from 0dB to current gain
             ctx.setLineDash([]);
             ctx.strokeStyle = g >= 0 ? "rgba(0, 210, 255, 0.75)" : "rgba(255, 69, 58, 0.75)";
-            ctx.lineWidth = 3;
+            ctx.lineWidth = isNarrow ? 2.5 : 3;
             ctx.beginPath();
             ctx.moveTo(x, zeroY);
             ctx.lineTo(x, y);
             ctx.stroke();
 
-            // Draggable fader handle cap
+            const capW = isNarrow ? 16 : 20;
+            const capH = isNarrow ? 10 : 12;
             ctx.fillStyle = g >= 0 ? "#00d2ff" : "#ff453a";
             ctx.shadowColor = g >= 0 ? "#00d2ff" : "#ff453a";
             ctx.shadowBlur = (this.selectedGraphicBand === i) ? 14 : 6;
             ctx.beginPath();
             if (ctx.roundRect) {
-                ctx.roundRect(x - 10, y - 6, 20, 12, 3);
+                ctx.roundRect(x - capW / 2, y - capH / 2, capW, capH, 3);
             } else {
-                ctx.rect(x - 10, y - 6, 20, 12);
+                ctx.rect(x - capW / 2, y - capH / 2, capW, capH);
             }
             ctx.fill();
 
             ctx.fillStyle = "#ffffff";
-            ctx.fillRect(x - 5, y - 1, 10, 2);
+            ctx.fillRect(x - 4, y - 1, 8, 2);
 
-            // Numeric dB badge above fader
             ctx.shadowBlur = 0;
             ctx.fillStyle = "#ffffff";
-            ctx.font = "600 9.5px 'JetBrains Mono', monospace";
+            ctx.font = `600 ${isNarrow ? 8.5 : 9.5}px 'JetBrains Mono', monospace`;
             ctx.textAlign = "center";
             const valStr = (g > 0 ? "+" : "") + g.toFixed(1);
-            ctx.fillText(valStr, x, y - 10);
+            ctx.fillText(valStr, x, y - 9);
         }
         ctx.restore();
     }
@@ -920,6 +988,7 @@ class EQCanvas {
         }
 
         const bands = this.audio.bands;
+        const isNarrow = (w < 540);
 
         bands.forEach((b, i) => {
             const x = this.freqToX(b.freq);
@@ -935,10 +1004,9 @@ class EQCanvas {
                 ctx.globalAlpha = 0.35;
             }
 
-            // Solo audition aura
             if (isSoloed) {
                 ctx.beginPath();
-                ctx.arc(x, y, 22, 0, Math.PI * 2);
+                ctx.arc(x, y, 20, 0, Math.PI * 2);
                 ctx.fillStyle = "rgba(255, 55, 95, 0.32)";
                 ctx.fill();
                 ctx.strokeStyle = "#ff375f";
@@ -948,10 +1016,9 @@ class EQCanvas {
                 ctx.setLineDash([]);
             }
 
-            // Selected Halo Ring
             if (isSelected || isHovered) {
                 ctx.beginPath();
-                ctx.arc(x, y, 15, 0, Math.PI * 2);
+                ctx.arc(x, y, isNarrow ? 13 : 15, 0, Math.PI * 2);
                 ctx.strokeStyle = color;
                 ctx.lineWidth = 1.5;
                 ctx.globalAlpha = b.enabled ? 0.65 : 0.3;
@@ -959,8 +1026,7 @@ class EQCanvas {
                 ctx.globalAlpha = b.enabled ? 1.0 : 0.35;
             }
 
-            // Main Colored Node Circle
-            const r = isSelected ? 10.5 : (isHovered ? 9.5 : 8.5);
+            const r = isSelected ? (isNarrow ? 9.5 : 10.5) : (isHovered ? 9.5 : (isNarrow ? 8 : 8.5));
             ctx.beginPath();
             ctx.arc(x, y, r, 0, Math.PI * 2);
             ctx.fillStyle = color;
@@ -968,10 +1034,9 @@ class EQCanvas {
             ctx.shadowBlur = (isSelected || isHovered) ? 14 : 5;
             ctx.fill();
 
-            // Band Number Inside Node (Pro-Q 3 style!)
             ctx.shadowBlur = 0;
             ctx.fillStyle = "#0b0d13";
-            ctx.font = "800 10px 'JetBrains Mono', monospace";
+            ctx.font = `800 ${isNarrow ? 9 : 10}px 'JetBrains Mono', monospace`;
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             ctx.fillText((i + 1).toString(), x, y + 0.5);
@@ -982,22 +1047,24 @@ class EQCanvas {
                 const note = this.freqToMusicalNote(b.freq);
                 const textDb = (b.gain > 0 ? "+" : "") + b.gain.toFixed(1) + " dB";
                 const textQ = "Q " + b.q.toFixed(2);
-                const tooltipText = `B${i + 1} (${b.label})  •  ${textHz} [${note}]  •  ${textDb}  •  ${textQ}`;
+                const tooltipText = isNarrow
+                    ? `B${i + 1}: ${textHz} • ${textDb} • ${textQ}`
+                    : `B${i + 1} (${b.label})  •  ${textHz} [${note}]  •  ${textDb}  •  ${textQ}`;
 
-                ctx.font = "600 10.5px 'JetBrains Mono', monospace";
+                ctx.font = `600 ${isNarrow ? 9.5 : 10.5}px 'JetBrains Mono', monospace`;
                 const textWidth = ctx.measureText(tooltipText).width;
-                const boxW = textWidth + 18;
-                const boxX = Math.max(8, Math.min(w - boxW - 8, x - boxW / 2));
-                const tipY = (y > this.paddingTop + 48) ? y - 24 : y + 26;
+                const boxW = Math.min(w - 12, textWidth + 16);
+                const boxX = Math.max(6, Math.min(w - boxW - 6, x - boxW / 2));
+                const tipY = (y > this.paddingTop + 42) ? y - 22 : y + 24;
 
                 ctx.fillStyle = "rgba(11, 14, 22, 0.94)";
                 ctx.strokeStyle = color;
                 ctx.lineWidth = 1.2;
                 ctx.beginPath();
                 if (ctx.roundRect) {
-                    ctx.roundRect(boxX, tipY - 12, boxW, 22, 5);
+                    ctx.roundRect(boxX, tipY - 11, boxW, 20, 5);
                 } else {
-                    ctx.rect(boxX, tipY - 12, boxW, 22);
+                    ctx.rect(boxX, tipY - 11, boxW, 20);
                 }
                 ctx.fill();
                 ctx.stroke();
@@ -1005,7 +1072,7 @@ class EQCanvas {
                 ctx.fillStyle = "#ffffff";
                 ctx.textBaseline = "alphabetic";
                 ctx.textAlign = "center";
-                ctx.fillText(tooltipText, boxX + boxW / 2, tipY + 3);
+                ctx.fillText(tooltipText, boxX + boxW / 2, tipY + 2.5);
             }
 
             ctx.restore();
