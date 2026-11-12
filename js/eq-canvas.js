@@ -1,15 +1,17 @@
 /**
  * EQ Master Trainer - Interactive Spectrum Analyzer & Sweet-Spot Visualizer
  * Fully responsive for Desktop, Mobile Portrait & Mobile Landscape with Multi-Touch Support
+ * Supports Low Cut (HPF) Visualization, Sweet Spot Gain & Interactive Q Width
  */
 
 class EQCanvas {
-    constructor(canvas, audioEngine, onSweetSpotChange, onHoverChange) {
+    constructor(canvas, audioEngine, onSweetSpotChange, onHoverChange, onQChange) {
         this.canvas = canvas;
         this.ctx = canvas.getContext("2d");
         this.audio = audioEngine;
         this.onSweetSpotChange = onSweetSpotChange;
         this.onHoverChange = onHoverChange;
+        this.onQChange = onQChange;
 
         this.displayWidth = canvas.width;
         this.displayHeight = canvas.height;
@@ -132,7 +134,7 @@ class EQCanvas {
                 const dy = y - nodeY;
                 const distNode = Math.sqrt(dx * dx + dy * dy);
 
-                // Check distance to node handle (radius 36px) or proximity to vertical target line (30px)
+                // Distance to node handle (36px) or vertical line (28px)
                 if (distNode < 36 && distNode < minDistance) {
                     minDistance = distNode;
                     bestIdx = i;
@@ -178,10 +180,9 @@ class EQCanvas {
             const pos = getPos(e);
             const nearest = findNearestZone(pos.x, pos.y);
 
-            // Double tap check
+            // Double tap check to reset
             const now = Date.now();
             if (nearest !== -1 && nearest === this.lastTapIndex && (now - this.lastTapTime) < 320) {
-                // Reset this zone to 0 dB
                 if (this.onSweetSpotChange) {
                     this.onSweetSpotChange(nearest, 0);
                 }
@@ -199,7 +200,6 @@ class EQCanvas {
                 this.hoveredIndex = nearest;
                 c.style.cursor = "ns-resize";
 
-                // Immediate gain adjust on touch/click
                 const newGain = Math.round(this.yToDb(pos.y) * 2) / 2;
                 const clamped = Math.max(-12, Math.min(12, newGain));
                 if (this.onSweetSpotChange) {
@@ -214,6 +214,21 @@ class EQCanvas {
             this.draggedIndex = -1;
             c.style.cursor = this.hoveredIndex !== -1 ? "ns-resize" : "crosshair";
         };
+
+        // Mouse Wheel for Q adjustment on node
+        c.addEventListener("wheel", (e) => {
+            const pos = getPos(e);
+            const nearest = findNearestZone(pos.x, pos.y);
+            if (nearest !== -1) {
+                e.preventDefault();
+                const currentQ = (this.audio.bands[nearest] ? this.audio.bands[nearest].q : 1.4);
+                const delta = e.deltaY > 0 ? -0.2 : 0.2;
+                const newQ = Math.round(Math.max(0.4, Math.min(6.0, currentQ + delta)) * 10) / 10;
+                if (this.onQChange) {
+                    this.onQChange(nearest, newQ);
+                }
+            }
+        }, { passive: false });
 
         c.addEventListener("mousedown", onStart);
         window.addEventListener("mousemove", onMove);
@@ -250,10 +265,13 @@ class EQCanvas {
         // 2. Draw Real-Time RTA Spectrum (if playing)
         this.drawSpectrum(ctx, w, h);
 
-        // 3. Draw Composite EQ Curve
+        // 3. Draw Low Cut Filter Visualizer Overlay
+        this.drawLowCutOverlay(ctx, w, h);
+
+        // 4. Draw Composite EQ Curve
         this.drawMasterEQCurve(ctx, w, h);
 
-        // 4. Draw Sweet-Spot Target Lines & Interactive Pin Callouts
+        // 5. Draw Sweet-Spot Target Lines, Interactive Pin Callouts & Q Bandwidth
         this.drawSweetSpots(ctx, w, h);
     }
 
@@ -289,24 +307,27 @@ class EQCanvas {
             ctx.fillText(lbl, x, h - 8);
         });
 
-        // dB Horizontal Lines (-12, -6, 0, +6, +12)
-        const dbs = [-12, -6, 0, 6, 12];
+        // dB Horizontal Lines (-12, -6, -4, -2, 0, +2, +4, +6, +12)
+        const dbs = [-12, -6, -4, -2, 0, 2, 4, 6, 12];
         dbs.forEach(db => {
             const y = Math.round(this.dbToY(db));
             const isZero = (db === 0);
+            const isMajor = (Math.abs(db) === 6 || Math.abs(db) === 12 || isZero);
 
             ctx.beginPath();
             ctx.moveTo(0, y);
             ctx.lineTo(w, y);
-            ctx.strokeStyle = isZero ? "rgba(255, 255, 255, 0.22)" : "rgba(255, 255, 255, 0.04)";
+            ctx.strokeStyle = isZero ? "rgba(255, 255, 255, 0.22)" : (isMajor ? "rgba(255, 255, 255, 0.05)" : "rgba(255, 255, 255, 0.025)");
             ctx.lineWidth = isZero ? 1.4 : 1;
             ctx.stroke();
 
-            // dB labels on both edges
-            ctx.fillStyle = isZero ? "rgba(255, 255, 255, 0.7)" : "rgba(255, 255, 255, 0.28)";
-            ctx.font = isZero ? "700 9.5px 'JetBrains Mono', monospace" : "500 9px 'JetBrains Mono', monospace";
-            ctx.textAlign = "left";
-            ctx.fillText(`${db > 0 ? "+" : ""}${db} dB`, 6, y - 3);
+            // Label on major levels
+            if (isMajor) {
+                ctx.fillStyle = isZero ? "rgba(255, 255, 255, 0.7)" : "rgba(255, 255, 255, 0.28)";
+                ctx.font = isZero ? "700 9.5px 'JetBrains Mono', monospace" : "500 9px 'JetBrains Mono', monospace";
+                ctx.textAlign = "left";
+                ctx.fillText(`${db > 0 ? "+" : ""}${db} dB`, 6, y - 3);
+            }
         });
 
         ctx.restore();
@@ -339,7 +360,6 @@ class EQCanvas {
             const interp = exactBin - b0;
             const rawVal = ((dataArray[b0] * (1 - interp)) + (dataArray[b1] * interp)) / 255.0;
 
-            // Attack & release smoothing
             this.spectrumPoints[i] = rawVal > this.spectrumPoints[i]
                 ? rawVal * 0.65 + this.spectrumPoints[i] * 0.35
                 : this.spectrumPoints[i] * 0.91;
@@ -358,7 +378,6 @@ class EQCanvas {
         ctx.lineTo(w, bottomY);
         ctx.closePath();
 
-        // Neon teal/cyan spectrum fill
         const specGrad = ctx.createLinearGradient(0, this.paddingTop, 0, bottomY);
         specGrad.addColorStop(0, "rgba(0, 229, 255, 0.38)");
         specGrad.addColorStop(0.5, "rgba(0, 210, 150, 0.22)");
@@ -366,11 +385,64 @@ class EQCanvas {
         ctx.fillStyle = specGrad;
         ctx.fill();
 
-        // Stroke line on top of spectrum
         ctx.strokeStyle = "rgba(0, 240, 255, 0.55)";
         ctx.lineWidth = 1.2;
         ctx.stroke();
 
+        ctx.restore();
+    }
+
+    drawLowCutOverlay(ctx, w, h) {
+        if (!this.audio.lowCutEnabled) return;
+        const lcFreq = this.audio.lowCutFreq || 80;
+        const x = Math.round(this.freqToX(lcFreq));
+        const bottomY = h - this.paddingBottom;
+
+        ctx.save();
+
+        // Shaded cut area to the left of Low Cut
+        const cutGrad = ctx.createLinearGradient(0, 0, x, 0);
+        cutGrad.addColorStop(0, "rgba(245, 158, 11, 0.18)");
+        cutGrad.addColorStop(1, "rgba(245, 158, 11, 0.02)");
+        ctx.fillStyle = cutGrad;
+        ctx.fillRect(0, this.paddingTop, x, bottomY - this.paddingTop);
+
+        // Vertical dashed line
+        ctx.beginPath();
+        ctx.setLineDash([4, 4]);
+        ctx.moveTo(x, this.paddingTop);
+        ctx.lineTo(x, bottomY);
+        ctx.strokeStyle = "#f59e0b";
+        ctx.lineWidth = 1.8;
+        ctx.shadowColor = "#f59e0b";
+        ctx.shadowBlur = 8;
+        ctx.stroke();
+
+        // Top Flag Badge
+        const tag = `HPF · ${Math.round(lcFreq)} Hz`;
+        ctx.font = "700 10.5px 'JetBrains Mono', monospace";
+        const tagW = ctx.measureText(tag).width + 12;
+        const tagH = 19;
+        const tagX = Math.max(4, x - tagW / 2);
+        const tagY = this.paddingTop + 4;
+
+        ctx.fillStyle = "rgba(18, 24, 36, 0.95)";
+        ctx.strokeStyle = "#f59e0b";
+        ctx.lineWidth = 1.2;
+        if (ctx.roundRect) {
+            ctx.beginPath();
+            ctx.roundRect(tagX, tagY, tagW, tagH, 4);
+            ctx.fill();
+            ctx.stroke();
+        } else {
+            ctx.fillRect(tagX, tagY, tagW, tagH);
+            ctx.strokeRect(tagX, tagY, tagW, tagH);
+        }
+
+        ctx.fillStyle = "#fbbf24";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(tag, tagX + tagW / 2, tagY + tagH / 2);
         ctx.restore();
     }
 
@@ -385,6 +457,15 @@ class EQCanvas {
         const nodes = this.audio.filterNodes;
 
         if (!this.audio.isBypassed) {
+            // 1. Include Low Cut Filter if enabled
+            if (this.audio.lowCutFilter && this.audio.lowCutEnabled) {
+                this.audio.lowCutFilter.getFrequencyResponse(this.responseFreqs, tempMag, tempPhase);
+                for (let i = 0; i < numPoints; i++) {
+                    totalMag[i] *= tempMag[i];
+                }
+            }
+
+            // 2. Include Sweet Spot Peaking Filters
             for (let b = 0; b < this.audio.bands.length; b++) {
                 if (this.audio.bands[b].enabled && nodes[b]) {
                     nodes[b].getFrequencyResponse(this.responseFreqs, tempMag, tempPhase);
@@ -408,7 +489,6 @@ class EQCanvas {
             else ctx.lineTo(x, y);
         }
 
-        // Glowing EQ response line
         ctx.shadowColor = "rgba(255, 214, 10, 0.6)";
         ctx.shadowBlur = 10;
         ctx.strokeStyle = "#ffd60a";
@@ -428,11 +508,38 @@ class EQCanvas {
             const freq = zone.centerFreq;
             const x = Math.round(this.freqToX(freq));
             const currentGain = (this.audio.bands[index] ? this.audio.bands[index].gain : 0);
+            const q = (this.audio.bands[index] ? this.audio.bands[index].q : (zone.q || 1.4));
             const nodeY = Math.round(this.dbToY(currentGain));
             const color = zone.color || "#00d2ff";
             const isHovered = (this.hoveredIndex === index || this.draggedIndex === index);
 
-            // 1. Vertical Target Guide Line (Dashed Laser)
+            // 1. Q Bandwidth Visualization on Hover/Drag
+            if (isHovered && currentGain !== 0) {
+                const f0 = freq;
+                const f1 = f0 * (Math.sqrt(1 + 1 / (4 * q * q)) - 1 / (2 * q));
+                const f2 = f0 * (Math.sqrt(1 + 1 / (4 * q * q)) + 1 / (2 * q));
+                const x1 = Math.max(2, this.freqToX(f1));
+                const x2 = Math.min(w - 2, this.freqToX(f2));
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(x1, nodeY);
+                ctx.lineTo(x2, nodeY);
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2.4;
+                ctx.shadowColor = color;
+                ctx.shadowBlur = 8;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(x1, nodeY, 2.5, 0, Math.PI * 2);
+                ctx.arc(x2, nodeY, 2.5, 0, Math.PI * 2);
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // 2. Vertical Target Guide Line (Dashed Laser)
             ctx.save();
             ctx.beginPath();
             ctx.setLineDash([4, 4]);
@@ -447,20 +554,19 @@ class EQCanvas {
             ctx.stroke();
             ctx.restore();
 
-            // 2. Top Pin Badge Callout (Tag with frequency & short title)
+            // 3. Top Pin Badge Callout (Tag with frequency, name & Q)
             const cleanName = zone.name.split("(")[0].trim();
             const freqText = freq >= 1000 ? `${(freq / 1000).toFixed(1)}k` : `${Math.round(freq)}`;
-            const pinText = `${freqText} Hz · ${cleanName}`;
+            const pinText = `${freqText} Hz · ${cleanName} · Q:${q.toFixed(1)}`;
 
             ctx.font = "600 11px 'Prompt', sans-serif";
             const textWidth = ctx.measureText(pinText).width;
-            const badgeW = Math.max(68, textWidth + 14);
+            const badgeW = Math.max(76, textWidth + 14);
             const badgeH = 22;
             const badgeX = Math.max(4, Math.min(w - badgeW - 4, x - badgeW / 2));
             const badgeY = 12;
 
             ctx.save();
-            // Badge background
             ctx.fillStyle = isHovered ? color : "rgba(20, 24, 34, 0.9)";
             ctx.strokeStyle = color;
             ctx.lineWidth = isHovered ? 2 : 1.2;
@@ -479,25 +585,22 @@ class EQCanvas {
                 ctx.strokeRect(badgeX, badgeY, badgeW, badgeH);
             }
 
-            // Badge text
             ctx.fillStyle = isHovered ? "#000000" : "#ffffff";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             ctx.fillText(pinText, badgeX + badgeW / 2, badgeY + badgeH / 2);
             ctx.restore();
 
-            // 3. Interactive Draggable Node on the EQ Curve
+            // 4. Interactive Draggable Node on the EQ Curve
             ctx.save();
             const nodeRadius = isHovered ? 10 : 8;
 
-            // Outer glowing ring
             ctx.beginPath();
             ctx.arc(x, nodeY, nodeRadius + 3, 0, Math.PI * 2);
             ctx.fillStyle = color;
             ctx.globalAlpha = isHovered ? 0.45 : 0.2;
             ctx.fill();
 
-            // Main node circle
             ctx.globalAlpha = 1.0;
             ctx.beginPath();
             ctx.arc(x, nodeY, nodeRadius, 0, Math.PI * 2);
@@ -506,14 +609,13 @@ class EQCanvas {
             ctx.shadowBlur = isHovered ? 14 : 6;
             ctx.fill();
 
-            // Inner center dot
             ctx.beginPath();
             ctx.arc(x, nodeY, 3, 0, Math.PI * 2);
             ctx.fillStyle = "#ffffff";
             ctx.fill();
             ctx.restore();
 
-            // 4. Live Gain Badge near the node (if gain is not 0 dB or hovered)
+            // 5. Live Gain Readout Badge near the node
             if (currentGain !== 0 || isHovered) {
                 const gainStr = `${currentGain > 0 ? "+" : ""}${currentGain.toFixed(1)} dB`;
                 ctx.save();

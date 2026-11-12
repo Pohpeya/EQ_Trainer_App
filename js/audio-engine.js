@@ -61,6 +61,11 @@ class AudioEngine {
 
         // Sound generator noise buffer
         this.noiseBuffer = null;
+
+        // Low Cut (High Pass Filter)
+        this.lowCutFilter = null;
+        this.lowCutEnabled = false;
+        this.lowCutFreq = 80;
     }
 
     init() {
@@ -113,21 +118,28 @@ class AudioEngine {
         this.normalGain = this.ctx.createGain();
         this.normalGain.gain.value = 1.0;
 
+        // Low Cut High-Pass Filter node
+        this.lowCutFilter = this.ctx.createBiquadFilter();
+        this.lowCutFilter.type = "highpass";
+        this.lowCutFilter.frequency.value = this.lowCutEnabled ? this.lowCutFreq : 10;
+        this.lowCutFilter.Q.value = 0.707;
+
         // Route:
-        // Input -> ParametricFilterChain -> paramGain -> normalGain -> outputGain -> limiter -> analyser -> destination
-        // Input -> GraphicFilterChain -> graphicGain -> normalGain
-        // Input -> soloFilter -> soloGain -> outputGain
-        this.inputGain.connect(this.filterNodes[0]);
+        // Input -> LowCutFilter -> ParametricFilterChain -> paramGain -> normalGain -> outputGain -> limiter -> analyser -> destination
+        // Input -> LowCutFilter -> GraphicFilterChain -> graphicGain -> normalGain
+        // Input -> LowCutFilter -> soloFilter -> soloGain -> outputGain
+        this.inputGain.connect(this.lowCutFilter);
+        this.lowCutFilter.connect(this.filterNodes[0]);
         this.filterNodes[this.filterNodes.length - 1].connect(this.paramGain);
         this.paramGain.connect(this.normalGain);
 
-        this.inputGain.connect(this.graphicFilterNodes[0]);
+        this.lowCutFilter.connect(this.graphicFilterNodes[0]);
         this.graphicFilterNodes[this.graphicFilterNodes.length - 1].connect(this.graphicGain);
         this.graphicGain.connect(this.normalGain);
 
         this.normalGain.connect(this.outputGain);
 
-        this.inputGain.connect(this.soloFilter);
+        this.lowCutFilter.connect(this.soloFilter);
         this.soloFilter.connect(this.soloGain);
         this.soloGain.connect(this.outputGain);
 
@@ -374,6 +386,25 @@ class AudioEngine {
         }
     }
 
+    setSweetSpotQ(index, q) {
+        if (index < 0 || index >= this.bands.length) return;
+        const clampedQ = Math.max(0.4, Math.min(8.0, q));
+        this.bands[index].q = clampedQ;
+        const node = this.filterNodes[index];
+        if (node && this.ctx) {
+            node.Q.setTargetAtTime(clampedQ, this.ctx.currentTime, 0.01);
+        }
+    }
+
+    setLowCut(enabled, freq) {
+        if (enabled !== undefined) this.lowCutEnabled = enabled;
+        if (freq !== undefined) this.lowCutFreq = Math.max(20, Math.min(400, freq));
+        if (this.lowCutFilter && this.ctx) {
+            const effectiveFreq = (this.lowCutEnabled && !this.isBypassed) ? this.lowCutFreq : 10;
+            this.lowCutFilter.frequency.setTargetAtTime(effectiveFreq, this.ctx.currentTime, 0.01);
+        }
+    }
+
     updateBand(index, params) {
         if (index < 0 || index >= this.bands.length) return;
         const b = this.bands[index];
@@ -430,6 +461,10 @@ class AudioEngine {
     setBypass(bypass) {
         this.isBypassed = bypass;
         if (!this.ctx) return;
+        if (this.lowCutFilter) {
+            const effectiveFreq = (!bypass && this.lowCutEnabled) ? this.lowCutFreq : 10;
+            this.lowCutFilter.frequency.setTargetAtTime(effectiveFreq, this.ctx.currentTime, 0.01);
+        }
         for (let i = 0; i < this.bands.length; i++) {
             const b = this.bands[i];
             const node = this.filterNodes[i];

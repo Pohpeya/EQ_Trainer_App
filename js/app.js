@@ -1,6 +1,7 @@
 /**
  * EQ Master Trainer - Main Controller
  * Focused Sweet-Spot Ear Training for Real Drum Loops
+ * Includes Low Cut (HPF), Interactive Q Width & ±2, ±4, ±6 dB Audition Levels
  */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -33,12 +34,19 @@ document.addEventListener("DOMContentLoaded", () => {
     const bypassBanner = document.getElementById("bypassBanner");
     const canvasElement = document.getElementById("eqCanvas");
 
+    // Low Cut Elements
+    const lowCutToggleBtn = document.getElementById("lowCutToggleBtn");
+    const lowCutStatusPill = document.getElementById("lowCutStatusPill");
+    const lowCutSlider = document.getElementById("lowCutSlider");
+    const lowCutReadout = document.getElementById("lowCutReadout");
+    const lowCutPresets = document.querySelectorAll(".btn-lc-preset");
+
     // Format frequency helper
     function formatHz(freq) {
         return freq >= 1000 ? (freq / 1000).toFixed(freq % 1000 === 0 ? 0 : 1) + " kHz" : Math.round(freq) + " Hz";
     }
 
-    // 2. Initialize Canvas Visualizer
+    // 2. Initialize Canvas Visualizer with Gain & Q callbacks
     const canvas = new EQCanvas(
         canvasElement,
         audio,
@@ -49,6 +57,10 @@ document.addEventListener("DOMContentLoaded", () => {
         (hoveredIndex) => {
             // Callback when user hovers a node
             highlightCard(hoveredIndex);
+        },
+        (zoneIndex, qVal) => {
+            // Callback when user scrolls mouse wheel over a node to adjust Q
+            setQForSweetSpot(zoneIndex, qVal);
         }
     );
 
@@ -111,7 +123,7 @@ document.addEventListener("DOMContentLoaded", () => {
         renderSweetSpotCards(instData.zones);
     }
 
-    // 5. Render Dedicated Sweet-Spot Control Cards
+    // 5. Render Dedicated Sweet-Spot Control Cards (with ±2, ±4, ±6 dB & Q)
     function renderSweetSpotCards(zones) {
         sweetSpotsGrid.innerHTML = "";
 
@@ -123,6 +135,7 @@ document.addEventListener("DOMContentLoaded", () => {
             card.style.setProperty("--zone-color", zone.color || "#00d2ff");
 
             const currentGain = audio.bands[index] ? audio.bands[index].gain : 0;
+            const currentQ = audio.bands[index] ? audio.bands[index].q : (zone.q || 1.4);
             const gainSign = currentGain > 0 ? `+${currentGain.toFixed(1)}` : `${currentGain.toFixed(1)}`;
 
             // Split title
@@ -139,39 +152,70 @@ document.addEventListener("DOMContentLoaded", () => {
                         <strong class="title-en">${enTitle}</strong>
                         <span class="title-th">${thTitle}</span>
                     </div>
-                    <div class="card-gain-readout" id="cardGainReadout_${index}">
-                        ${gainSign} dB
+                    <div class="card-badges-right">
+                        <span class="card-q-badge" id="cardQBadge_${index}">Q: ${currentQ.toFixed(1)}</span>
+                        <div class="card-gain-readout ${currentGain > 0 ? 'boosted' : (currentGain < 0 ? 'cut' : 'flat')}" id="cardGainReadout_${index}">
+                            ${gainSign} dB
+                        </div>
                     </div>
                 </div>
 
-                <!-- Instant Audition Buttons (1-Tap to hear!) -->
-                <div class="card-quick-actions">
-                    <button type="button" class="btn-step step-cut ${currentGain === -6 ? 'active' : ''}" data-index="${index}" data-gain="-6" title="ตัดเสียงย่านนี้ลง -6 dB">
-                        🔻 -6 dB (ตัด)
-                    </button>
-                    <button type="button" class="btn-step step-flat ${currentGain === 0 ? 'active' : ''}" data-index="${index}" data-gain="0" title="คืนค่าเป็นเสียงปกติ 0 dB">
-                        🔄 0 dB (เดิม)
-                    </button>
-                    <button type="button" class="btn-step step-boost ${currentGain === 6 ? 'active' : ''}" data-index="${index}" data-gain="6" title="เร่งเสียงย่านนี้ขึ้น +6 dB">
-                        🔺 +6 dB (เร่ง)
-                    </button>
+                <!-- 7 Audition Level Buttons: -6, -4, -2, 0, +2, +4, +6 dB -->
+                <div class="card-levels-section">
+                    <div class="level-btn-row">
+                        <!-- Cut buttons (-6, -4, -2) -->
+                        <div class="level-btn-group cut-group">
+                            <button type="button" class="btn-step step-cut ${currentGain === -6 ? 'active' : ''}" data-index="${index}" data-gain="-6">-6 dB</button>
+                            <button type="button" class="btn-step step-cut ${currentGain === -4 ? 'active' : ''}" data-index="${index}" data-gain="-4">-4 dB</button>
+                            <button type="button" class="btn-step step-cut ${currentGain === -2 ? 'active' : ''}" data-index="${index}" data-gain="-2">-2 dB</button>
+                        </div>
+
+                        <!-- Reset Flat (0 dB) -->
+                        <button type="button" class="btn-step step-flat ${currentGain === 0 ? 'active' : ''}" data-index="${index}" data-gain="0" title="คืนค่าเป็น 0 dB (Flat)">
+                            0 dB
+                        </button>
+
+                        <!-- Boost buttons (+2, +4, +6) -->
+                        <div class="level-btn-group boost-group">
+                            <button type="button" class="btn-step step-boost ${currentGain === 2 ? 'active' : ''}" data-index="${index}" data-gain="2">+2 dB</button>
+                            <button type="button" class="btn-step step-boost ${currentGain === 4 ? 'active' : ''}" data-index="${index}" data-gain="4">+4 dB</button>
+                            <button type="button" class="btn-step step-boost ${currentGain === 6 ? 'active' : ''}" data-index="${index}" data-gain="6">+6 dB</button>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Smooth Slider -->
+                <!-- Continuous Gain Slider -->
                 <div class="card-fader-row">
                     <span class="fader-limit">-12</span>
                     <input type="range" class="fader-range" id="fader_${index}" data-index="${index}" min="-12" max="12" step="0.5" value="${currentGain}">
                     <span class="fader-limit">+12 dB</span>
                 </div>
 
+                <!-- Q (Bandwidth) Controller -->
+                <div class="card-q-section">
+                    <div class="q-header-row">
+                        <span class="q-label">ความกว้างย่านเสียง (Q):</span>
+                        <div class="q-presets">
+                            <button type="button" class="btn-q-preset ${Math.abs(currentQ - 0.7) < 0.2 ? 'active' : ''}" data-index="${index}" data-q="0.7">0.7 กว้าง</button>
+                            <button type="button" class="btn-q-preset ${Math.abs(currentQ - 1.4) < 0.2 ? 'active' : ''}" data-index="${index}" data-q="1.4">1.4 ปกติ</button>
+                            <button type="button" class="btn-q-preset ${Math.abs(currentQ - 3.0) < 0.2 ? 'active' : ''}" data-index="${index}" data-q="3.0">3.0 แคบ</button>
+                        </div>
+                    </div>
+                    <div class="q-slider-row">
+                        <span class="q-sub-lbl">กว้าง (0.4)</span>
+                        <input type="range" class="q-range" id="qSlider_${index}" data-index="${index}" min="0.4" max="6.0" step="0.1" value="${currentQ}">
+                        <span class="q-sub-lbl">แคบ (6.0)</span>
+                    </div>
+                </div>
+
                 <!-- Ear Training Cues -->
                 <div class="card-cues">
                     <div class="cue-item cue-boost">
-                        <span class="cue-label">🔺 เร่ง (+):</span>
+                        <span class="cue-label">🔺 ถ้าเร่ง:</span>
                         <span class="cue-text">${zone.ifBoosted || zone.idealTone}</span>
                     </div>
                     <div class="cue-item cue-cut">
-                        <span class="cue-label">🔻 ตัด (-):</span>
+                        <span class="cue-label">🔻 ถ้าตัด:</span>
                         <span class="cue-text">${zone.ifCut}</span>
                     </div>
                 </div>
@@ -194,7 +238,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // 6. Card Control Interactions
     function attachCardControls() {
-        // Step buttons: -6, 0, +6 dB
+        // Step buttons: -6, -4, -2, 0, +2, +4, +6 dB
         sweetSpotsGrid.querySelectorAll(".btn-step").forEach(btn => {
             btn.addEventListener("click", (e) => {
                 e.stopPropagation();
@@ -204,7 +248,7 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         });
 
-        // Sliders: continuous real-time adjustment
+        // Gain sliders: continuous real-time adjustment
         sweetSpotsGrid.querySelectorAll(".fader-range").forEach(slider => {
             const idx = parseInt(slider.dataset.index, 10);
 
@@ -221,9 +265,30 @@ document.addEventListener("DOMContentLoaded", () => {
                 setGainForSweetSpot(idx, 0);
             });
         });
+
+        // Q Preset buttons: 0.7, 1.4, 3.0
+        sweetSpotsGrid.querySelectorAll(".btn-q-preset").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const idx = parseInt(btn.dataset.index, 10);
+                const q = parseFloat(btn.dataset.q);
+                setQForSweetSpot(idx, q);
+            });
+        });
+
+        // Q Sliders
+        sweetSpotsGrid.querySelectorAll(".q-range").forEach(qSlider => {
+            const idx = parseInt(qSlider.dataset.index, 10);
+            const handleQ = () => {
+                const q = parseFloat(qSlider.value);
+                setQForSweetSpot(idx, q);
+            };
+            qSlider.addEventListener("input", handleQ);
+            qSlider.addEventListener("change", handleQ);
+        });
     }
 
-    // 7. Update Gain Helper (Unified for Canvas drag, Step buttons, and Sliders)
+    // 7. Update Gain Helper
     function setGainForSweetSpot(index, gainDb) {
         audio.init();
 
@@ -258,6 +323,36 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    // 8. Update Q Helper
+    function setQForSweetSpot(index, qVal) {
+        audio.init();
+        const clampedQ = Math.max(0.4, Math.min(6.0, qVal));
+
+        // 1. Update Audio Engine
+        audio.setSweetSpotQ(index, clampedQ);
+
+        // 2. Update Q Badge
+        const qBadge = document.getElementById(`cardQBadge_${index}`);
+        if (qBadge) {
+            qBadge.textContent = `Q: ${clampedQ.toFixed(1)}`;
+        }
+
+        // 3. Update Q Slider
+        const qSlider = document.getElementById(`qSlider_${index}`);
+        if (qSlider && parseFloat(qSlider.value) !== clampedQ) {
+            qSlider.value = clampedQ;
+        }
+
+        // 4. Update Q Preset Buttons
+        const card = document.getElementById(`sweetCard_${index}`);
+        if (card) {
+            card.querySelectorAll(".btn-q-preset").forEach(btn => {
+                const btnQ = parseFloat(btn.dataset.q);
+                btn.classList.toggle("active", Math.abs(btnQ - clampedQ) < 0.2);
+            });
+        }
+    }
+
     // Highlight Card from Canvas hover
     function highlightCard(index) {
         sweetSpotsGrid.querySelectorAll(".sweet-card").forEach((c, idx) => {
@@ -265,7 +360,48 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // 8. Transport Controls
+    // 9. Low Cut (HPF) Controls
+    function updateLowCutUI() {
+        const isEnabled = audio.lowCutEnabled;
+        const freq = audio.lowCutFreq || 40;
+
+        lowCutToggleBtn.classList.toggle("active", isEnabled);
+        lowCutStatusPill.textContent = isEnabled ? "ON" : "OFF";
+        lowCutStatusPill.className = `lowcut-status-pill ${isEnabled ? 'on' : 'off'}`;
+
+        lowCutSlider.disabled = !isEnabled;
+        lowCutSlider.value = freq;
+        lowCutReadout.textContent = `${Math.round(freq)} Hz`;
+
+        lowCutPresets.forEach(btn => {
+            const btnF = parseFloat(btn.dataset.freq);
+            btn.classList.toggle("active", isEnabled && Math.abs(btnF - freq) < 5);
+        });
+    }
+
+    lowCutToggleBtn.addEventListener("click", () => {
+        audio.init();
+        const newState = !audio.lowCutEnabled;
+        audio.setLowCut(newState);
+        updateLowCutUI();
+    });
+
+    lowCutPresets.forEach(btn => {
+        btn.addEventListener("click", () => {
+            audio.init();
+            const freq = parseFloat(btn.dataset.freq);
+            audio.setLowCut(true, freq);
+            updateLowCutUI();
+        });
+    });
+
+    lowCutSlider.addEventListener("input", (e) => {
+        const freq = parseFloat(e.target.value);
+        audio.setLowCut(true, freq);
+        updateLowCutUI();
+    });
+
+    // 10. Transport Controls
     // Play / Stop
     function togglePlay() {
         audio.init();
@@ -331,14 +467,15 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // 9. Start Main Animation Loop
+    // 11. Start Main Animation Loop
     function renderLoop() {
         canvas.draw();
         requestAnimationFrame(renderLoop);
     }
     requestAnimationFrame(renderLoop);
 
-    // 10. Initial Setup
+    // 12. Initial Setup
     renderInstrumentNav();
     selectInstrument(currentInstrumentId);
+    updateLowCutUI();
 });

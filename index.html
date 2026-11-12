@@ -77,12 +77,42 @@
                 </div>
             </section>
 
+            <!-- LOW CUT (HPF) CONTROL STRIP -->
+            <section class="lowcut-section" id="lowCutSection">
+                <div class="lowcut-controls-row">
+                    <button type="button" id="lowCutToggleBtn" class="btn-lowcut" title="เปิด/ปิด Low Cut Filter (ตัดความถี่ต่ำลึกที่ไม่จำเป็นออก)">
+                        <span class="lowcut-power-icon">⏻</span>
+                        <strong class="lowcut-title">LOW CUT (HPF)</strong>
+                        <span id="lowCutStatusPill" class="lowcut-status-pill off">OFF</span>
+                    </button>
+
+                    <div class="lowcut-presets-group">
+                        <span class="lowcut-lbl">ความถี่ตัด:</span>
+                        <button type="button" class="btn-lc-preset active" data-freq="40">40 Hz</button>
+                        <button type="button" class="btn-lc-preset" data-freq="80">80 Hz</button>
+                        <button type="button" class="btn-lc-preset" data-freq="120">120 Hz</button>
+                        <button type="button" class="btn-lc-preset" data-freq="160">160 Hz</button>
+                    </div>
+
+                    <div class="lowcut-slider-group">
+                        <span class="lc-boundary">20 Hz</span>
+                        <input type="range" id="lowCutSlider" class="lc-fader" min="20" max="300" step="5" value="40">
+                        <span class="lc-boundary">300 Hz</span>
+                        <span id="lowCutReadout" class="lc-val">40 Hz</span>
+                    </div>
+                </div>
+
+                <div class="lowcut-guide-hint">
+                    💡 <strong>Low Cut (HPF):</strong> ตัดเสียงฮัมต่ำลึกและเสียงสะท้อนที่ไม่จำเป็นออก เพื่อป้องกันเสียงบวม และเพิ่มความโปร่งใส (Headroom) ให้มิกซ์
+                </div>
+            </section>
+
             <!-- DIRECT SWEET-SPOTS CONTROLLER -->
             <section class="sweetspots-section">
                 <div class="sweetspots-header">
                     <div class="sec-title-wrap">
                         <h2>🎯 ปรับย่านเสียงสำคัญของเครื่องดนตรีนี้</h2>
-                        <span class="sec-subtitle">กดปุ่ม <strong>[+6 dB เร่ง]</strong> หรือ <strong>[-6 dB ตัด]</strong> เพื่อฟังความเปลี่ยนแปลงทันที</span>
+                        <span class="sec-subtitle">เลือกความดัง <strong>±2 dB, ±4 dB, ±6 dB</strong> และปรับค่า <strong>Q (ความกว้าง)</strong> ได้ตามต้องการ</span>
                     </div>
                     <span id="activeZoneSummary" class="sec-summary">4 ย่านเสียงสำคัญ</span>
                 </div>
