@@ -1,15 +1,15 @@
 /* 
  * PRO-EQ Studio Trainer - VST3 / AU Audio Plugin Stylesheet
- * Inspired by FabFilter Pro-Q 3, Logic Pro Channel EQ, Ableton EQ Eight & Kirchhoff-EQ
+ * Unified Compact Layout: Smart Sweet-Spot Station + Pro EQ & Live RTA
  */
 
 :root {
     --bg-chassis: #0a0c11;
     --bg-dark: #0e1118;
-    --bg-panel: #151923;
+    --bg-panel: #141824;
     --bg-panel-elevated: #1b202e;
-    --bg-card: #1f2536;
-    --bg-card-hover: #272f44;
+    --bg-card: #1a202f;
+    --bg-card-hover: #242c40;
     --border-color: rgba(255, 255, 255, 0.09);
     --border-subtle: rgba(255, 255, 255, 0.05);
     --border-glow: rgba(0, 210, 255, 0.45);
@@ -149,24 +149,6 @@ header.app-header {
     box-shadow: 0 0 18px rgba(0, 210, 255, 0.55);
 }
 
-.btn-danger {
-    background: rgba(255, 69, 58, 0.2);
-    border-color: var(--accent-red);
-    color: #ff827a;
-}
-
-.btn-danger:hover {
-    background: rgba(255, 69, 58, 0.32);
-    color: #ffffff;
-}
-
-.btn-active {
-    background: var(--accent-gold);
-    color: #0a0c12;
-    border-color: var(--accent-gold);
-    box-shadow: 0 0 12px rgba(255, 214, 10, 0.45);
-}
-
 .volume-control {
     display: flex;
     align-items: center;
@@ -211,6 +193,7 @@ header.app-header {
     gap: 8px;
     overflow-x: auto;
     scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
 }
 
 .inst-group {
@@ -243,7 +226,7 @@ header.app-header {
     background: #1a202e;
     border: 1px solid rgba(255, 255, 255, 0.08);
     color: var(--text-secondary);
-    padding: 5px 11px;
+    padding: 6px 12px;
     border-radius: 5px;
     font-family: var(--font-ui);
     font-size: 12px;
@@ -301,28 +284,20 @@ header.app-header {
 }
 
 /* =========================================================
-   3. 2-PANE STUDIO WORKSPACE LAYOUT
+   3. UNIFIED STUDIO WORKSPACE (CENTERED & COMPACT)
    ========================================================= */
 main.app-main {
     flex: 1;
-    display: grid;
-    grid-template-columns: minmax(0, 1.72fr) minmax(360px, 1fr);
-    gap: 14px;
+    display: flex;
+    justify-content: center;
     padding: 12px 16px;
-    max-width: 1800px;
+    max-width: 1040px;
     width: 100%;
     margin: 0 auto;
-    align-items: start;
 }
 
-@media (max-width: 1180px) {
-    main.app-main {
-        grid-template-columns: 1fr;
-    }
-}
-
-/* LEFT PANE: PLUGIN CHASSIS UNIT */
 .plugin-unit-pane {
+    width: 100%;
     background: var(--bg-panel);
     border: 1px solid rgba(255, 255, 255, 0.11);
     border-radius: 10px;
@@ -333,14 +308,14 @@ main.app-main {
     box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
 }
 
-/* Plugin Sub-Toolbar */
+/* Sub-Toolbar: Mode Switcher + Presets + Display Scale */
 .eq-mode-bar {
     display: flex;
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 8px;
-    background: #10131c;
+    background: #0f131c;
     padding: 6px 10px;
     border-radius: 7px;
     border: 1px solid var(--border-subtle);
@@ -348,7 +323,7 @@ main.app-main {
 
 .mode-switch-group {
     display: inline-flex;
-    background: #0a0c12;
+    background: #090b10;
     padding: 2px;
     border-radius: 6px;
     border: 1px solid var(--border-color);
@@ -376,7 +351,6 @@ main.app-main {
     box-shadow: inset 0 0 0 1px rgba(0, 210, 255, 0.4);
 }
 
-/* Inline Presets Strip */
 .presets-inline-bar {
     display: flex;
     align-items: center;
@@ -415,7 +389,6 @@ main.app-main {
     border-color: var(--accent-cyan);
 }
 
-/* dB Range Selector */
 .analyzer-options {
     display: flex;
     align-items: center;
@@ -463,9 +436,9 @@ main.app-main {
    ========================================================= */
 .analyzer-stage {
     display: grid;
-    grid-template-columns: 1fr 42px;
+    grid-template-columns: 1fr 40px;
     gap: 8px;
-    height: 360px;
+    height: 320px;
 }
 
 .eq-screen-wrapper {
@@ -481,7 +454,7 @@ main.app-main {
 
 .eq-screen-header {
     position: absolute;
-    top: 44px;
+    top: 40px;
     left: 12px;
     right: 48px;
     display: flex;
@@ -544,11 +517,12 @@ main.app-main {
     width: 100%;
     height: 100%;
     display: block;
+    touch-action: none;
 }
 
 .canvas-hint {
     position: absolute;
-    bottom: 26px;
+    bottom: 24px;
     left: 12px;
     font-size: 10.5px;
     color: rgba(255, 255, 255, 0.45);
@@ -630,7 +604,323 @@ main.app-main {
 }
 
 /* =========================================================
-   5. PARAMETRIC 8-BAND CONTROLLER DOCK & ROTARY KNOBS
+   5. SMART SWEET-SPOT STATION (ALL-IN-ONE COMPACT CONTROLLER)
+   ========================================================= */
+.smart-station-rack {
+    background: #111520;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.smart-zones-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.smart-section-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.3px;
+}
+
+.smart-inst-badge {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 800;
+    background: rgba(0, 210, 255, 0.12);
+    border: 1px solid rgba(0, 210, 255, 0.35);
+    color: var(--accent-cyan);
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+/* Sweet-Spot Big Tactile Buttons Grid */
+.smart-zones-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 8px;
+}
+
+.smart-zone-btn {
+    background: #171c2b;
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    border-left: 4px solid var(--zone-color, var(--accent-cyan));
+    border-radius: 7px;
+    padding: 9px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    transition: all 0.15s ease;
+    text-align: left;
+}
+
+.smart-zone-btn:hover {
+    background: #20273c;
+    border-color: rgba(255, 255, 255, 0.22);
+}
+
+.smart-zone-btn.active {
+    background: rgba(0, 210, 255, 0.12);
+    border-color: var(--zone-color, var(--accent-cyan));
+    box-shadow: 0 0 14px rgba(0, 210, 255, 0.25);
+}
+
+.smart-btn-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.smart-btn-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.smart-btn-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+
+.smart-btn-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.smart-btn-thai {
+    font-size: 11px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.smart-btn-freq {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 800;
+    background: #0c0f16;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--zone-color, var(--accent-cyan));
+    border: 1px solid currentColor;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* Fast-Action Gain Strip (ชิดติดกับปุ่มย่านเสียง) */
+.smart-controls-strip {
+    background: #161b28;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.smart-ctrl-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding-bottom: 8px;
+}
+
+.smart-active-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #ffffff;
+}
+
+.smart-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--zone-color, var(--accent-cyan));
+    box-shadow: 0 0 8px currentColor;
+}
+
+.smart-freq-pill {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    background: #0a0d14;
+    padding: 2px 7px;
+    border-radius: 4px;
+    color: var(--zone-color, var(--accent-cyan));
+    border: 1px solid currentColor;
+}
+
+.smart-gain-display {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.gain-val-number {
+    font-size: 19px;
+    font-weight: 800;
+    color: var(--accent-cyan);
+}
+
+/* Instant Step Buttons & Smooth Gain Slider */
+.smart-gain-action-row {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.smart-step-buttons {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+}
+
+.step-btn {
+    background: #1a2030;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 9px 6px;
+    border-radius: 6px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s ease;
+}
+
+.step-btn:hover {
+    background: #242d44;
+    color: #ffffff;
+}
+
+.step-btn.cut-heavy.active,
+.step-btn.cut-heavy:hover {
+    background: rgba(255, 69, 58, 0.25);
+    border-color: var(--accent-red);
+    color: #ff8b85;
+}
+
+.step-btn.cut-light.active,
+.step-btn.cut-light:hover {
+    background: rgba(255, 159, 10, 0.25);
+    border-color: var(--accent-orange);
+    color: #ffb852;
+}
+
+.step-btn.reset-flat.active,
+.step-btn.reset-flat:hover {
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.4);
+    color: #ffffff;
+}
+
+.step-btn.boost-light.active,
+.step-btn.boost-light:hover {
+    background: rgba(0, 210, 255, 0.22);
+    border-color: var(--accent-cyan);
+    color: #5cd6ff;
+}
+
+.step-btn.boost-heavy.active,
+.step-btn.boost-heavy:hover {
+    background: rgba(48, 209, 88, 0.25);
+    border-color: var(--accent-green);
+    color: #75f096;
+}
+
+.smart-slider-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 0;
+}
+
+.slider-boundary {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 700;
+}
+
+.smart-fader {
+    flex: 1;
+    height: 8px;
+    accent-color: var(--accent-cyan);
+    cursor: pointer;
+    touch-action: none;
+}
+
+/* Concise 1-Line Micro Guide */
+.smart-micro-guide {
+    background: #0f131d;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 2px;
+}
+
+.micro-row {
+    font-size: 13px;
+    line-height: 1.5;
+    color: #e2e8f0;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.micro-tag {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 3px;
+    white-space: nowrap;
+}
+
+.micro-tag.tag-boost {
+    background: rgba(0, 210, 255, 0.15);
+    color: #5cd6ff;
+}
+
+.micro-tag.tag-cut {
+    background: rgba(255, 69, 58, 0.15);
+    color: #ff8b85;
+}
+
+.micro-tag.tag-tip {
+    background: rgba(255, 214, 10, 0.15);
+    color: var(--accent-gold);
+}
+
+/* =========================================================
+   6. PARAMETRIC 8-BAND CONTROLLER DOCK (PRO-Q MODE)
    ========================================================= */
 .band-rack {
     background: #10141e;
@@ -642,17 +932,10 @@ main.app-main {
     gap: 10px;
 }
 
-/* 8-Band At-A-Glance Grid */
 .band-selector-tabs {
     display: grid;
     grid-template-columns: repeat(8, 1fr);
     gap: 6px;
-}
-
-@media (max-width: 768px) {
-    .band-selector-tabs {
-        grid-template-columns: repeat(4, 1fr);
-    }
 }
 
 .band-tab-btn {
@@ -670,13 +953,12 @@ main.app-main {
 
 .band-tab-btn:hover {
     background: #202738;
-    border-color: rgba(255, 255, 255, 0.22);
 }
 
 .band-tab-btn.active {
     background: #222a3d;
     border-color: var(--band-color, var(--accent-cyan));
-    box-shadow: 0 0 12px rgba(0, 0, 0, 0.5), inset 0 0 10px rgba(255, 255, 255, 0.04);
+    box-shadow: 0 0 12px rgba(0, 0, 0, 0.5);
 }
 
 .band-tab-btn.band-disabled {
@@ -695,11 +977,6 @@ main.app-main {
     border-radius: 50%;
     border: 1.5px solid currentColor;
     cursor: pointer;
-    transition: transform 0.15s;
-}
-
-.band-power-dot:hover {
-    transform: scale(1.25);
 }
 
 .band-num {
@@ -708,18 +985,12 @@ main.app-main {
     font-weight: 800;
 }
 
-.band-shape-icon {
-    display: flex;
-    align-items: center;
-}
-
 .band-card-freq {
     font-family: var(--font-mono);
     font-size: 11px;
     font-weight: 600;
     color: #ffffff;
     text-align: center;
-    margin-top: 2px;
 }
 
 .band-card-gain {
@@ -729,17 +1000,6 @@ main.app-main {
     text-align: center;
 }
 
-.band-card-gain.is-boost {
-    color: var(--accent-cyan);
-    font-weight: 700;
-}
-
-.band-card-gain.is-cut {
-    color: #ff6961;
-    font-weight: 700;
-}
-
-/* Selected Band Precision Deck (Shapes + 3 Rotary Knobs) */
 .band-controls-group {
     display: flex;
     align-items: center;
@@ -774,9 +1034,7 @@ main.app-main {
     color: var(--accent-cyan);
 }
 
-.power-switch input {
-    display: none;
-}
+.power-switch input { display: none; }
 
 .power-btn-ui {
     font-family: var(--font-mono);
@@ -812,7 +1070,6 @@ main.app-main {
     background: var(--accent-red);
     border-color: var(--accent-red);
     color: #ffffff;
-    box-shadow: 0 0 10px rgba(255, 69, 58, 0.5);
 }
 
 .shape-buttons-label {
@@ -884,18 +1141,19 @@ main.app-main {
 }
 
 .rotary-knob-Interactive {
-    width: 68px;
-    height: 68px;
+    width: 64px;
+    height: 64px;
     position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: ns-resize;
+    touch-action: none;
 }
 
 .knob-svg {
-    width: 68px;
-    height: 68px;
+    width: 64px;
+    height: 64px;
     transform: rotate(135deg);
     position: absolute;
     top: 0;
@@ -919,12 +1177,12 @@ main.app-main {
 }
 
 .knob-cap {
-    width: 44px;
-    height: 44px;
+    width: 42px;
+    height: 42px;
     border-radius: 50%;
     background: radial-gradient(circle at 35% 30%, #343d52 0%, #1a202c 70%, #12161f 100%);
     border: 1.5px solid rgba(255, 255, 255, 0.18);
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.65), inset 0 1px 2px rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.65);
     position: relative;
     display: flex;
     justify-content: center;
@@ -932,28 +1190,28 @@ main.app-main {
 
 .knob-indicator {
     width: 2.5px;
-    height: 12px;
+    height: 11px;
     background: #ffffff;
     border-radius: 2px;
-    margin-top: 4px;
+    margin-top: 3px;
     box-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
 }
 
 .param-knob-box .param-value {
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: 11.5px;
     font-weight: 700;
     color: var(--accent-cyan);
     background: #0d1018;
-    padding: 2px 8px;
+    padding: 2px 7px;
     border-radius: 4px;
     border: 1px solid rgba(255, 255, 255, 0.08);
-    min-width: 82px;
+    min-width: 78px;
     text-align: center;
 }
 
 .param-slider {
-    width: 96px;
+    width: 90px;
     height: 4px;
     accent-color: var(--accent-cyan);
     cursor: pointer;
@@ -961,7 +1219,7 @@ main.app-main {
 }
 
 /* =========================================================
-   6. GRAPHIC EQ 10-BAND CONSOLE
+   7. GRAPHIC EQ 10-BAND CONSOLE
    ========================================================= */
 .graphic-eq-rack {
     background: #10141e;
@@ -1068,6 +1326,7 @@ main.app-main {
     height: 104px;
     cursor: pointer;
     accent-color: var(--accent-cyan);
+    touch-action: none;
 }
 
 .fader-freq-label {
@@ -1084,506 +1343,7 @@ main.app-main {
 }
 
 /* =========================================================
-   7. RIGHT PANE: STUDIO TONE INSPECTOR & EAR TRAINER DOCK
-   ========================================================= */
-.inspector-dock-pane {
-    background: var(--bg-panel);
-    border: 1px solid rgba(255, 255, 255, 0.11);
-    border-radius: 10px;
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
-}
-
-.dock-tabs-bar {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px;
-    background: #0d1018;
-    padding: 4px;
-    border-radius: 7px;
-    border: 1px solid var(--border-color);
-}
-
-.dock-tab-btn {
-    background: transparent;
-    border: none;
-    color: var(--text-secondary);
-    padding: 7px 10px;
-    border-radius: 5px;
-    font-family: var(--font-ui);
-    font-size: 12.5px;
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    transition: all 0.15s;
-}
-
-.dock-tab-btn:hover {
-    color: #ffffff;
-}
-
-.dock-tab-btn.active {
-    background: #1f2738;
-    color: #ffffff;
-    box-shadow: inset 0 0 0 1px rgba(0, 210, 255, 0.45);
-}
-
-.content-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.panel-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 8px;
-    border-bottom: 1px solid var(--border-color);
-    padding-bottom: 8px;
-}
-
-.panel-title {
-    font-size: 15px;
-    font-weight: 700;
-    color: #ffffff;
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 6px;
-}
-
-.panel-desc {
-    font-size: 11.5px;
-    color: var(--text-secondary);
-    margin-top: 3px;
-    line-height: 1.45;
-}
-
-.guide-header-actions {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
-}
-
-.panel-badge {
-    font-family: var(--font-mono);
-    background: rgba(0, 210, 255, 0.12);
-    border: 1px solid rgba(0, 210, 255, 0.35);
-    color: var(--accent-cyan);
-    font-size: 10px;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-weight: 700;
-    white-space: nowrap;
-}
-
-.btn-zone-expand {
-    background: #19202f;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    color: var(--text-secondary);
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-family: var(--font-ui);
-    font-size: 11px;
-    font-weight: 600;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    transition: all 0.15s;
-}
-
-.btn-zone-expand:hover {
-    background: #232c40;
-    color: #ffffff;
-    border-color: var(--accent-cyan);
-}
-
-/* =========================================================
-   7. INTERACTIVE FREQUENCY SPECTRUM STRIP & ACCORDION CARDS
-   ========================================================= */
-.zones-spectrum-wrap {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    background: #0f131d;
-    padding: 8px 10px;
-    border-radius: 6px;
-    border: 1px solid var(--border-subtle);
-}
-
-.zones-spectrum-label {
-    font-family: var(--font-mono);
-    font-size: 9.5px;
-    color: var(--text-muted);
-    font-weight: 700;
-    letter-spacing: 0.3px;
-}
-
-.zones-spectrum-track {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    overflow-x: auto;
-    padding-bottom: 3px;
-    scrollbar-width: thin;
-    -webkit-overflow-scrolling: touch;
-}
-
-.spectrum-chip {
-    background: #171d2b;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    color: var(--text-secondary);
-    padding: 5px 9px;
-    border-radius: 5px;
-    font-family: var(--font-ui);
-    font-size: 11.5px;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    white-space: nowrap;
-    transition: all 0.15s ease;
-    flex-shrink: 0;
-}
-
-.spectrum-chip:hover {
-    background: #222b3e;
-    color: #ffffff;
-    border-color: var(--chip-color, var(--accent-cyan));
-}
-
-.spectrum-chip.active {
-    background: rgba(0, 210, 255, 0.16);
-    border-color: var(--chip-color, var(--accent-cyan));
-    color: #ffffff;
-    box-shadow: 0 0 10px rgba(0, 210, 255, 0.3);
-}
-
-.spectrum-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    display: inline-block;
-}
-
-.spectrum-freq {
-    font-family: var(--font-mono);
-    font-size: 11px;
-    font-weight: 700;
-    color: #ffffff;
-}
-
-.spectrum-name {
-    font-size: 11px;
-    color: var(--text-secondary);
-}
-
-.zones-guide-hint {
-    font-size: 11px;
-    color: #b8d4f2;
-    background: rgba(0, 210, 255, 0.07);
-    border: 1px solid rgba(0, 210, 255, 0.2);
-    padding: 6px 10px;
-    border-radius: 6px;
-}
-
-/* Sweet-Spot Interactive Zone Cards */
-.zones-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    max-height: 520px;
-    overflow-y: auto;
-    padding-right: 4px;
-    scrollbar-width: thin;
-}
-
-.zone-card {
-    background: #141824;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 8px;
-    transition: all 0.18s ease;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-}
-
-.zone-card:hover {
-    background: #192030;
-    border-color: rgba(255, 255, 255, 0.18);
-}
-
-.zone-card.is-expanded {
-    border-color: var(--zone-color, var(--accent-cyan));
-    background: #151a28;
-    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
-}
-
-/* Zone Card Header (Compact 1-row summary) */
-.zone-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 12px;
-    cursor: pointer;
-    gap: 10px;
-    user-select: none;
-    transition: background 0.15s;
-}
-
-.zone-header:hover {
-    background: rgba(255, 255, 255, 0.03);
-}
-
-.zone-header-left {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex: 1;
-    min-width: 0;
-}
-
-.zone-color-bar {
-    width: 3.5px;
-    height: 32px;
-    border-radius: 2px;
-    flex-shrink: 0;
-}
-
-.zone-freq-cluster {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    flex-shrink: 0;
-}
-
-.zone-center-pill {
-    font-family: var(--font-mono);
-    font-size: 11.5px;
-    font-weight: 800;
-    background: #0d1017;
-    border: 1px solid currentColor;
-    padding: 1px 6px;
-    border-radius: 4px;
-    text-align: center;
-    white-space: nowrap;
-}
-
-.zone-range-text {
-    font-family: var(--font-mono);
-    font-size: 9px;
-    color: var(--text-muted);
-    white-space: nowrap;
-}
-
-.zone-title-block {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-}
-
-.zone-title {
-    font-size: 13px;
-    font-weight: 700;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.zone-teaser {
-    font-size: 11px;
-    color: var(--text-secondary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.zone-header-right {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-}
-
-.quick-audition-group {
-    display: flex;
-    gap: 4px;
-}
-
-.quick-aud-btn {
-    background: #1c2333;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    font-weight: 700;
-    padding: 4px 7px;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.15s;
-    white-space: nowrap;
-}
-
-.quick-aud-btn:hover {
-    background: #273148;
-    color: #ffffff;
-}
-
-.quick-aud-btn.btn-boost.active {
-    background: rgba(0, 210, 255, 0.28);
-    border-color: var(--accent-cyan);
-    color: #ffffff;
-    box-shadow: 0 0 8px rgba(0, 210, 255, 0.45);
-}
-
-.quick-aud-btn.btn-cut.active {
-    background: rgba(255, 69, 58, 0.28);
-    border-color: var(--accent-red);
-    color: #ffffff;
-    box-shadow: 0 0 8px rgba(255, 69, 58, 0.45);
-}
-
-.zone-chevron {
-    font-size: 11px;
-    color: var(--text-muted);
-    width: 16px;
-    text-align: center;
-}
-
-/* Zone Drawer (Expanded View with Full Details) */
-.zone-drawer {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    padding: 10px 12px 12px 12px;
-    background: rgba(10, 13, 20, 0.6);
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.zone-spec-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-}
-
-.zone-spec-card {
-    background: #161b28;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 6px;
-    padding: 8px 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-}
-
-.zone-spec-card.spec-ideal {
-    border-left: 3px solid var(--accent-green);
-}
-
-.zone-spec-card.spec-boost {
-    border-left: 3px solid var(--accent-orange);
-}
-
-.zone-spec-card.spec-cut {
-    border-left: 3px solid var(--accent-cyan);
-}
-
-.zone-spec-card.spec-protip {
-    border-left: 3px solid var(--accent-gold);
-    grid-column: 1 / -1;
-    background: rgba(255, 214, 10, 0.05);
-}
-
-.spec-label {
-    font-size: 10.5px;
-    font-weight: 700;
-}
-
-.spec-ideal .spec-label {
-    color: #5ce67e;
-}
-
-.spec-boost .spec-label {
-    color: #ffb340;
-}
-
-.spec-cut .spec-label {
-    color: #5cd6ff;
-}
-
-.spec-protip .spec-label {
-    color: var(--accent-gold);
-}
-
-.spec-desc {
-    font-size: 12.5px;
-    color: #e2e8f0;
-    line-height: 1.5;
-}
-
-/* Detailed Audition Bar inside Drawer */
-.zone-audition-bar {
-    display: flex;
-    gap: 6px;
-    margin-top: 2px;
-}
-
-.zone-aud-btn {
-    flex: 1;
-    background: #1a2131;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: var(--text-primary);
-    padding: 7px 10px;
-    border-radius: 5px;
-    font-family: var(--font-ui);
-    font-size: 11.5px;
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-    transition: all 0.15s;
-}
-
-.zone-aud-btn:hover {
-    background: #252f46;
-    border-color: rgba(255, 255, 255, 0.25);
-    color: #ffffff;
-}
-
-.zone-aud-btn.aud-boost.active {
-    background: rgba(0, 210, 255, 0.28);
-    border-color: var(--accent-cyan);
-    color: #ffffff;
-    box-shadow: 0 0 10px rgba(0, 210, 255, 0.4);
-}
-
-.zone-aud-btn.aud-cut.active {
-    background: rgba(255, 69, 58, 0.28);
-    border-color: var(--accent-red);
-    color: #ffffff;
-    box-shadow: 0 0 10px rgba(255, 69, 58, 0.4);
-}
-
-.zone-aud-btn.aud-flat:hover {
-    border-color: var(--accent-gold);
-    color: var(--accent-gold);
-}
-
-/* =========================================================
-   9. BADGES & DRAG-DROP OVERLAY
+   8. BADGES & DRAG-DROP OVERLAY
    ========================================================= */
 .real-sample-badge {
     display: inline-flex;
@@ -1640,168 +1400,12 @@ main.app-main {
 }
 
 /* =========================================================
-   10. MULTI-DEVICE RESPONSIVE DESIGN
-   (Computer Desktop, Mobile Portrait แนวตั้ง & Mobile Landscape แนวนอน)
+   9. RESPONSIVE DESIGN (DESKTOP & MOBILE PHONES)
    ========================================================= */
-
-/* Mobile Quick-Switch Bottom Bar (Hidden on Desktop by default) */
-.mobile-bottom-nav {
-    display: none;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 56px;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-    background: rgba(13, 16, 24, 0.96);
-    backdrop-filter: blur(12px);
-    border-top: 1px solid rgba(255, 255, 255, 0.14);
-    z-index: 900;
-    grid-template-columns: repeat(3, 1fr);
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.65);
-}
-
-.mob-nav-btn {
-    background: transparent;
-    border: none;
-    color: var(--text-muted);
-    font-family: var(--font-ui);
-    font-size: 11px;
-    font-weight: 600;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    border-top: 2px solid transparent;
-}
-
-.mob-nav-btn.active {
-    color: var(--accent-cyan);
-    background: rgba(0, 210, 255, 0.08);
-    border-top-color: var(--accent-cyan);
-}
-
-/* Touch Action & Smooth Scrolling Improvements */
-#eqCanvas,
-.rotary-knob-Interactive,
-.graphic-v-slider {
-    touch-action: none;
-}
-
-.instruments-bar,
-.presets-chips-wrap,
-.filter-shape-pills,
-.zones-spectrum-track {
-    -webkit-overflow-scrolling: touch;
-}
-
-/* ---------------------------------------------------------
-   A. TABLET & MOBILE PORTRAIT (แนวตั้ง: <= 900px)
-   --------------------------------------------------------- */
-@media (max-width: 900px) {
-    body {
-        padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
-    }
-
-    .mobile-bottom-nav {
-        display: grid;
-    }
-
-    /* Mobile View Filter Classes controlled by #mobileBottomNav */
-    main.app-main.mob-view-eq .inspector-dock-pane {
-        display: none !important;
-    }
-
-    main.app-main.mob-view-guide .plugin-unit-pane {
-        display: none !important;
-    }
-
-    /* Tone Guide in Mobile View */
-    main.app-main.mob-view-guide .inspector-dock-pane {
-        width: 100% !important;
-        max-height: none !important;
-        padding: 12px;
-    }
-
-    .inspector-dock-pane {
-        max-height: none;
-    }
-
-    .zones-list {
-        max-height: none;
-        overflow-y: visible;
-    }
-
-    /* Mobile Portrait Typography & High-Readability Overhaul */
-    .zone-header {
-        padding: 9px 10px;
-    }
-
-    .zone-title {
-        font-size: 13.5px;
-    }
-
-    .zone-teaser {
-        font-size: 11.5px;
-        color: #b8c4d8;
-    }
-
-    .zone-drawer {
-        padding: 10px 10px 14px 10px;
-    }
-
-    /* Full-width 1-column specification cards so text breathes and is easy to read */
-    .zone-spec-grid {
-        grid-template-columns: 1fr;
-        gap: 8px;
-    }
-
-    .zone-spec-card {
-        padding: 10px 12px;
-        border-radius: 7px;
-        background: #171d2b;
-    }
-
-    .spec-label {
-        font-size: 11.5px;
-        margin-bottom: 2px;
-    }
-
-    .spec-desc {
-        font-size: 13.5px;
-        line-height: 1.6;
-        color: #f1f5f9;
-        font-weight: 400;
-    }
-
-    .zone-audition-bar {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 6px;
-    }
-
-    .zone-aud-btn {
-        padding: 10px 8px;
-        font-size: 12px;
-        min-height: 40px;
-    }
-
-    .zone-aud-btn.aud-flat {
-        grid-column: 1 / -1;
-    }
-
-    .quick-aud-btn {
-        padding: 5px 8px;
-        font-size: 11px;
-        min-height: 32px;
-    }
-
+@media (max-width: 768px) {
     header.app-header {
-        padding: 8px 12px;
-        gap: 8px;
+        padding: 6px 12px;
+        gap: 6px;
     }
 
     .brand .subtitle {
@@ -1815,16 +1419,12 @@ main.app-main {
     .header-controls {
         width: 100%;
         justify-content: space-between;
-        gap: 5px;
-    }
-
-    .header-divider {
-        display: none;
+        gap: 4px;
     }
 
     .btn {
-        padding: 6px 10px;
-        font-size: 11.5px;
+        padding: 6px 8px;
+        font-size: 11px;
         flex: 1 1 auto;
         justify-content: center;
     }
@@ -1832,29 +1432,20 @@ main.app-main {
     .volume-control {
         flex: 1 1 100%;
         justify-content: space-between;
-        padding: 5px 10px;
     }
 
-    .volume-slider {
-        flex: 1;
-        max-width: 180px;
-    }
-
-    /* Swipeable Instrument Channel Strip */
     .instruments-bar {
         padding: 6px 10px;
-        gap: 6px;
+        gap: 5px;
     }
 
     .instrument-pill {
-        padding: 6px 12px;
+        padding: 5px 10px;
         font-size: 11.5px;
     }
 
     main.app-main {
-        grid-template-columns: 1fr;
-        padding: 8px;
-        gap: 10px;
+        padding: 6px 8px;
     }
 
     .plugin-unit-pane {
@@ -1864,48 +1455,30 @@ main.app-main {
 
     .eq-mode-bar {
         padding: 6px 8px;
-        gap: 6px;
     }
 
     .mode-switch-group {
         width: 100%;
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(3, 1fr);
     }
 
     .mode-switch-btn {
         justify-content: center;
-        font-size: 11.5px;
-        padding: 6px 8px;
+        font-size: 11px;
+        padding: 5px 4px;
     }
 
-    .presets-inline-bar {
-        width: 100%;
-        overflow-x: auto;
-        flex-wrap: nowrap;
-        padding-bottom: 2px;
-    }
-
-    .presets-chips-wrap {
-        flex-wrap: nowrap;
-    }
-
-    .preset-chip {
-        white-space: nowrap;
-        padding: 4px 10px;
-    }
-
-    /* Analyzer Stage Sizing for Portrait */
     .analyzer-stage {
-        height: 265px;
-        grid-template-columns: 1fr 34px;
+        height: 240px;
+        grid-template-columns: 1fr 32px;
         gap: 6px;
     }
 
     .eq-screen-header {
-        top: 28px;
+        top: 26px;
         left: 8px;
-        right: 38px;
+        right: 36px;
     }
 
     .eq-screen-header > span {
@@ -1913,293 +1486,141 @@ main.app-main {
     }
 
     .canvas-hint {
-        font-size: 9.5px;
-        bottom: 22px;
-        left: 8px;
-        right: 8px;
+        font-size: 9px;
+        bottom: 20px;
+        left: 6px;
+        right: 6px;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
 
-    /* 8-Band Cards: 4x2 Touch Grid */
+    /* Smart Station Mobile: 2 Columns Grid for Thumb Tapping */
+    .smart-zones-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+    }
+
+    .smart-zone-btn {
+        padding: 8px 10px;
+    }
+
+    .smart-btn-icon {
+        font-size: 16px;
+    }
+
+    .smart-btn-title {
+        font-size: 12px;
+    }
+
+    .smart-btn-thai {
+        font-size: 10.5px;
+    }
+
+    .smart-btn-freq {
+        font-size: 9.5px;
+        padding: 1px 4px;
+    }
+
+    .smart-controls-strip {
+        padding: 10px 10px;
+        gap: 10px;
+    }
+
+    .step-btn {
+        padding: 8px 4px;
+        font-size: 11px;
+    }
+
+    .micro-row {
+        font-size: 12.5px;
+    }
+
+    /* Pro 8-Band in Mobile */
     .band-selector-tabs {
         grid-template-columns: repeat(4, 1fr);
-        gap: 5px;
-    }
-
-    .band-tab-btn {
-        padding: 5px 6px;
-    }
-
-    /* Selected Band Controls & 3 Rotary Knobs side-by-side */
-    .band-controls-group {
-        flex-direction: column;
-        align-items: stretch;
-        padding: 10px;
-        gap: 12px;
-    }
-
-    .band-shape-deck {
-        width: 100%;
-    }
-
-    .selected-band-header {
-        justify-content: space-between;
-    }
-
-    .filter-shape-pills {
-        display: grid;
-        grid-template-columns: repeat(5, 1fr);
         gap: 4px;
-    }
-
-    .shape-pill {
-        flex-direction: column;
-        justify-content: center;
-        padding: 5px 2px;
-        font-size: 9.5px;
-        gap: 3px;
     }
 
     .rotary-knobs-cluster {
         width: 100%;
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        gap: 8px;
+        gap: 6px;
         justify-items: center;
     }
 
-    .rotary-knob-Interactive {
-        width: 60px;
-        height: 60px;
-    }
-
-    .knob-svg {
-        width: 60px;
-        height: 60px;
-    }
-
-    .knob-cap {
-        width: 38px;
-        height: 38px;
-    }
-
-    .param-knob-box .param-value {
-        font-size: 11px;
-        min-width: 72px;
-        padding: 2px 5px;
-    }
-
-    .param-slider {
-        width: 82px;
-    }
-
-    /* 10-Band Graphic EQ Touch Scroll */
     .graphic-faders-container {
         overflow-x: auto;
-        grid-template-columns: repeat(10, minmax(52px, 1fr));
-        gap: 6px;
+        grid-template-columns: repeat(10, minmax(50px, 1fr));
     }
 }
 
-/* Small Phone Portrait (<= 480px) */
-@media (max-width: 480px) {
-    .analyzer-stage {
-        height: 235px;
-        grid-template-columns: 1fr 30px;
-    }
-
-    .legend-item {
-        display: none;
-    }
-
-    .cursor-readout {
-        font-size: 9.5px;
-        min-width: 120px;
-    }
-
-    .param-slider {
-        width: 72px;
-    }
-}
-
-/* ---------------------------------------------------------
-   B. MOBILE & TABLET LANDSCAPE (แนวนอน: ความสูงไม่เกิน 560px)
-   ออกแบบให้วางคู่มือ/ควิซคู่กับหน้าจอ EQ แบบ 2 คอลัมน์พอดีจอแนวนอน
-   --------------------------------------------------------- */
+/* Landscape Phone (max-height <= 560px) */
 @media (max-height: 560px) and (orientation: landscape) {
-    body {
-        padding-bottom: 0;
-    }
-
-    .mobile-bottom-nav {
-        display: none !important;
-    }
-
-    /* Ensure both panes remain visible in landscape split view */
-    main.app-main.mob-view-eq .inspector-dock-pane,
-    main.app-main.mob-view-guide .plugin-unit-pane {
-        display: flex !important;
-    }
-
     header.app-header {
-        padding: 4px 12px;
-        gap: 6px;
+        padding: 4px 10px;
+        gap: 4px;
     }
 
     .brand .subtitle {
         display: none;
     }
 
-    .brand h1 {
-        font-size: 13.5px;
-    }
-
-    .header-controls {
-        width: auto;
-        gap: 4px;
-    }
-
     .btn {
-        padding: 4px 8px;
-        font-size: 11px;
-        flex: 0 0 auto;
+        padding: 3px 6px;
+        font-size: 10.5px;
     }
 
     .volume-control {
-        flex: 0 0 auto;
-        padding: 2px 8px;
+        padding: 2px 6px;
     }
 
     .volume-slider {
-        width: 55px;
+        width: 50px;
     }
 
     .instruments-bar {
-        padding: 4px 12px;
-        gap: 5px;
+        padding: 3px 8px;
     }
 
     .instrument-pill {
-        padding: 3px 9px;
-        font-size: 11px;
+        padding: 3px 8px;
+        font-size: 10.5px;
     }
 
-    /* Side-by-Side 2-Column Split on Landscape Phone */
     main.app-main {
-        grid-template-columns: minmax(0, 1.38fr) minmax(260px, 0.92fr);
-        gap: 8px;
-        padding: 6px 10px;
-    }
-
-    .plugin-unit-pane {
-        padding: 8px;
-        gap: 6px;
-    }
-
-    .eq-mode-bar {
         padding: 4px 8px;
     }
 
-    .mode-switch-group {
-        width: auto;
-        display: inline-flex;
-    }
-
     .analyzer-stage {
-        height: 195px;
-        grid-template-columns: 1fr 32px;
+        height: 180px;
     }
 
     .canvas-hint {
         display: none;
     }
 
-    .band-rack {
-        padding: 6px 8px;
+    .smart-zones-grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 5px;
+    }
+
+    .smart-zone-btn {
+        padding: 5px 8px;
+    }
+
+    .smart-controls-strip {
+        padding: 8px 10px;
         gap: 6px;
     }
 
-    .band-selector-tabs {
-        grid-template-columns: repeat(8, 1fr);
-        gap: 4px;
+    .step-btn {
+        padding: 6px 4px;
+        font-size: 10.5px;
     }
 
-    .band-tab-btn {
-        padding: 4px;
-    }
-
-    .band-card-freq {
-        font-size: 9.5px;
-    }
-
-    .band-card-gain {
-        font-size: 9px;
-    }
-
-    .band-controls-group {
-        flex-direction: row;
-        padding: 6px 10px;
-        gap: 8px;
-    }
-
-    .band-shape-deck {
-        width: auto;
-        gap: 4px;
-    }
-
-    .filter-shape-pills {
-        display: flex;
-        gap: 4px;
-    }
-
-    .shape-pill {
-        flex-direction: row;
-        padding: 3px 6px;
-        font-size: 9.5px;
-    }
-
-    .rotary-knobs-cluster {
-        width: auto;
-        display: flex;
-        gap: 14px;
-    }
-
-    .rotary-knob-Interactive {
-        width: 50px;
-        height: 50px;
-    }
-
-    .knob-svg {
-        width: 50px;
-        height: 50px;
-    }
-
-    .knob-cap {
-        width: 32px;
-        height: 32px;
-    }
-
-    .knob-indicator {
-        height: 9px;
-        margin-top: 3px;
-    }
-
-    .param-knob-box .param-value {
-        font-size: 10px;
-        min-width: 64px;
-    }
-
-    .param-slider {
-        width: 68px;
-    }
-
-    .inspector-dock-pane {
-        max-height: calc(100vh - 82px);
-    }
-
-    .zones-list {
-        max-height: calc(100vh - 210px);
+    .micro-row {
+        font-size: 11px;
     }
 }

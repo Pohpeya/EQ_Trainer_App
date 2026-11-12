@@ -2,68 +2,54 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#0a0c11">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>PRO-EQ Studio Trainer — Mastering &amp; Mixing Equalizer Plugin</title>
-    <!-- Google Fonts: Prompt for Thai UI, JetBrains Mono for Digital Readouts -->
+    <title>PRO-EQ Studio Trainer - DAW Audio Plugin &amp; Interactive EQ</title>
+    <!-- Google Fonts: Prompt & JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Prompt:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <!-- =========================================================
-         PLUGIN TOP CHASSIS BAR (DAW VST3 / AU HEADER)
+         1. PLUGIN TOP CHASSIS BAR (DAW / VST3 HEADER)
          ========================================================= -->
     <header class="app-header">
         <div class="brand">
-            <div class="plugin-badge">VST3</div>
-            <div class="brand-text">
-                <h1>PRO-EQ <span>STUDIO TRAINER</span></h1>
-                <div class="subtitle">Interactive Frequency Analyzer &amp; Ear Training Workstation</div>
-            </div>
+            <span class="plugin-badge">VST3 / AU</span>
+            <h1>PRO-EQ <span>STUDIO TRAINER</span></h1>
+            <span class="subtitle">| Professional Acoustic &amp; RTA Analyzer</span>
         </div>
 
-        <!-- Center Transport & Plugin Global Actions -->
+        <!-- Master Transport & Utility Strip -->
         <div class="header-controls">
-            <button id="playBtn" class="btn btn-primary" title="เริ่ม/หยุดเล่นเสียงเครื่องดนตรี (Spacebar)">
-                <span>▶</span> <span class="btn-label-text">เล่นเสียง (Play)</span>
+            <button id="playBtn" class="btn btn-primary" title="เล่น/หยุดเสียงตัวอย่าง (Spacebar)">
+                <span class="btn-icon">▶</span> <span class="btn-text">PLAY</span>
+            </button>
+            <button id="bypassBtn" class="btn" title="ปิดการทำงาน EQ ชั่วคราวเพื่อฟังเทียบ A/B">
+                <span class="btn-icon">⚡</span> <span class="btn-text">BYPASS EQ</span>
+            </button>
+            <button id="soloBtn" class="btn" title="ฟังเฉพาะย่านความถี่ที่เลือก (Band Pass Solo)">
+                <span class="btn-icon">🎧</span> <span class="btn-text">BAND SOLO</span>
+            </button>
+            <button id="resetEqBtn" class="btn" title="รีเซ็ตค่า EQ ทุกแบนด์กลับเป็น 0 dB">
+                <span class="btn-icon">🔄</span> <span class="btn-text">FLAT ALL</span>
             </button>
 
             <div class="header-divider"></div>
 
-            <button id="bypassBtn" class="btn" title="สลับฟังเสียงดิบก่อนปรับเทียบกับหลังปรับ (A/B Bypass)">
-                <span>⚡</span> <span class="btn-label-text">Bypass EQ</span>
-            </button>
-
-            <button id="soloBtn" class="btn" title="ฟังเจาะจงเฉพาะย่านความถี่ที่เลือก (Band Audition)">
-                <span>🎧</span> <span class="btn-label-text">Solo Band</span>
-            </button>
-
-            <button id="resetEqBtn" class="btn" title="คืนค่า EQ ทั้งหมดกลับเป็น 0 dB (Flat Reset)">
-                <span>🔄</span> <span class="btn-label-text">Flat Reset</span>
-            </button>
-
-            <div class="header-divider hide-on-mobile"></div>
-
-            <div class="volume-control" title="ควบคุมความเร็วสำหรับเครื่องดนตรีสังเคราะห์">
-                <span class="ctrl-label">BPM</span>
-                <input type="range" id="tempoSlider" class="volume-slider" min="60" max="160" step="1" value="100">
-                <span id="tempoValue" class="mono-val">100</span>
-            </div>
-
-            <div class="volume-control" title="ระดับความดังขาออก (Master Output Gain)">
-                <span class="ctrl-label">OUT</span>
-                <input type="range" id="volumeSlider" class="volume-slider" min="0" max="1" step="0.01" value="0.85">
+            <!-- Master Volume Fader -->
+            <div class="volume-control" title="ปรับระดับเสียงหลัก (Master Output Level)">
+                <span class="ctrl-label">VOL</span>
+                <input type="range" id="volumeSlider" class="volume-slider" min="0" max="1" step="0.01" value="0.8">
                 <span id="volumeReadout" class="mono-val">0.0 dB</span>
             </div>
         </div>
     </header>
 
     <!-- =========================================================
-         TRACK / CHANNEL SELECTOR BAR (DAW MIXER CHANNELS)
+         2. TRACK / CHANNEL SELECTOR BAR (DAW MIXER CHANNELS)
          ========================================================= -->
     <nav class="instruments-bar" id="instrumentsBar">
         <!-- Populated dynamically via JS with categorized channel strips -->
@@ -71,19 +57,21 @@
     <input type="file" id="audioFileInput" accept="audio/*" style="display: none;">
 
     <!-- =========================================================
-         MAIN STUDIO WORKSPACE (2-PANE PLUGIN + ASSISTANT DOCK)
+         3. MAIN UNIFIED STUDIO WORKSPACE (COMPACT & INTUITIVE)
          ========================================================= -->
     <main class="app-main" id="appMainWorkspace">
-        <!-- LEFT PANE: THE EQ PLUGIN UNIT -->
         <div class="plugin-unit-pane" id="pluginUnitPane">
-            <!-- Plugin Sub-Toolbar: Mode Switcher + Presets + Display Scale -->
+            <!-- Mode Switcher + Presets + Display Scale Bar -->
             <div class="eq-mode-bar">
                 <div class="mode-switch-group">
-                    <button id="modeParametricBtn" class="mode-switch-btn active">
-                        <span>🎛️</span> <span>Parametric (8-Band)</span>
+                    <button id="modeSmartBtn" class="mode-switch-btn active" title="ปรับตามย่านเสียงสำคัญ ง่าย รวดเร็ว และอยู่ชิดกัน">
+                        <span>🎯</span> <span>Smart EQ (ปรับตามเนื้อเสียง)</span>
                     </button>
-                    <button id="modeGraphicBtn" class="mode-switch-btn">
-                        <span>📊</span> <span>Graphic (10-Band)</span>
+                    <button id="modeParametricBtn" class="mode-switch-btn" title="โหมด Pro ปรับอิสระ 8 แบนด์">
+                        <span>🎛️</span> <span>Pro 8-Band</span>
+                    </button>
+                    <button id="modeGraphicBtn" class="mode-switch-btn" title="โหมด Graphic EQ 10 แบนด์">
+                        <span>📊</span> <span>Graphic 10-Band</span>
                     </button>
                 </div>
 
@@ -112,7 +100,6 @@
             <!-- Main Analyzer Display + Right Output Meter -->
             <div class="analyzer-stage">
                 <section class="eq-screen-wrapper">
-                    <!-- Top Sub-Header inside Analyzer -->
                     <div class="eq-screen-header">
                         <span id="canvasModeLabel">PRO-Q SPECTRUM ANALYZER &amp; COMPOSITE CURVE</span>
                         <div class="analyzer-legend">
@@ -125,11 +112,11 @@
                     <canvas id="eqCanvas"></canvas>
 
                     <div class="canvas-hint" id="canvasHint">
-                        💡 ลากจุดปรับ Freq/Gain | เลื่อนล้อเมาส์หรือจีบ 2 นิ้วปรับ Q | ดับเบิลคลิก/แตะ 2 ครั้งรีเซ็ต 0 dB
+                        💡 ลากจุดปรับ Freq/Gain | แตะเลือกย่านเสียงด้านล่างเพื่อปรับทันที | ดับเบิลคลิก/แตะ 2 ครั้งรีเซ็ต 0 dB
                     </div>
                 </section>
 
-                <!-- Hardware Stereo Output Meter (Right side of EQ Display) -->
+                <!-- Hardware Stereo Output Meter -->
                 <aside class="output-meter-strip" title="Stereo Output Peak & RMS Level (dBFS)">
                     <div class="meter-header">OUT</div>
                     <div class="meter-body">
@@ -156,17 +143,69 @@
             </div>
 
             <!-- =====================================================
-                 PARAMETRIC 8-BAND CONTROLLER DOCK (Pro-Q / Channel EQ)
+                 STATION 1: SMART SWEET-SPOT STATION (ง่ายที่สุด เครื่องมือชิดติดกัน)
                  ===================================================== -->
-            <section class="band-rack" id="parametricRack">
-                <!-- All 8 Bands At-A-Glance Strip -->
+            <section class="smart-station-rack" id="smartStationRack">
+                <!-- Zone Selection Buttons: Big, Clear, Tactile -->
+                <div class="smart-zones-header">
+                    <span class="smart-section-label">⚡ แตะเลือกย่านเสียงที่ต้องการปรับ:</span>
+                    <span class="smart-inst-badge" id="smartInstBadge">🥁 KICK</span>
+                </div>
+                <div class="smart-zones-grid" id="smartZonesGrid">
+                    <!-- Dynamic Sweet-Spot Buttons inserted here -->
+                </div>
+
+                <!-- Unified Fast-Action Gain Strip (อยู่ติดกับปุ่มเลือกย่านทันที) -->
+                <div class="smart-controls-strip">
+                    <div class="smart-ctrl-header">
+                        <div class="smart-active-title" id="smartActiveZoneTitle">
+                            <span class="smart-dot" id="smartActiveDot"></span>
+                            <strong id="smartActiveName">Punch (แรงกระแทกหน้าอก)</strong>
+                            <span class="smart-freq-pill" id="smartActiveFreqPill">90 Hz</span>
+                        </div>
+                        <div class="smart-gain-display" id="smartGainDisplay">
+                            <span class="gain-lbl">GAIN:</span>
+                            <strong id="smartGainValueText" class="gain-val-number">0.0 dB</strong>
+                        </div>
+                    </div>
+
+                    <!-- Instant Step Buttons & Smooth Gain Slider -->
+                    <div class="smart-gain-action-row">
+                        <div class="smart-step-buttons">
+                            <button type="button" class="step-btn cut-heavy" data-step="-6" title="ตัดลง -6 dB">🔻 -6 dB</button>
+                            <button type="button" class="step-btn cut-light" data-step="-3" title="ตัดลง -3 dB">➖ -3 dB</button>
+                            <button type="button" class="step-btn reset-flat active" data-step="0" title="คืนค่าเป็น 0 dB (Flat)">🔄 0 dB (Flat)</button>
+                            <button type="button" class="step-btn boost-light" data-step="3" title="เร่งขึ้น +3 dB">➕ +3 dB</button>
+                            <button type="button" class="step-btn boost-heavy" data-step="6" title="เร่งขึ้น +6 dB">🔺 +6 dB</button>
+                        </div>
+                        
+                        <div class="smart-slider-wrap">
+                            <span class="slider-boundary">-18 dB</span>
+                            <input type="range" id="smartGainSlider" class="smart-fader" min="-18" max="18" step="0.5" value="0">
+                            <span class="slider-boundary">+18 dB</span>
+                        </div>
+                    </div>
+
+                    <!-- Concise 1-Line Micro Guide (สรุปสั้น 3 บรรทัด เข้าใจทันที ไม่ต้องอ่านยาว) -->
+                    <div class="smart-micro-guide" id="smartMicroGuide">
+                        <div class="micro-row"><span class="micro-tag tag-boost">🔺 ถ้าเร่งเสียง:</span> <span id="microBoostText">เสียงตึ้บแน่นกระแทกอก ได้ยินชัดแม้ในลำโพงขนาดเล็ก</span></div>
+                        <div class="micro-row"><span class="micro-tag tag-cut">🔻 ถ้าตัดเสียง:</span> <span id="microCutText">เสียงกระเดื่องจะฟุ้งและไม่มีพลังขับเคลื่อน</span></div>
+                        <div class="micro-row"><span class="micro-tag tag-tip">💡 คำแนะนำ:</span> <span id="microTipText">ลองเร่งช่วง 80 - 95 Hz เล็กน้อยเพื่อให้เสียงกลองเตะทะลุเสียงเบส</span></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- =====================================================
+                 STATION 2: PARAMETRIC 8-BAND CONTROLLER (Pro-Q Mode)
+                 ===================================================== -->
+            <section class="band-rack" id="parametricRack" style="display: none;">
+                <!-- 8 Bands Overview Strip -->
                 <div class="band-selector-tabs" id="bandTabsContainer">
                     <!-- 8 Band Overview Cards generated via JS -->
                 </div>
 
                 <!-- Selected Band Precision Control Deck (Filter Shapes + 3 Rotary Knobs) -->
                 <div class="band-controls-group">
-                    <!-- Left: Band Identity, Power & Filter Shape Selector -->
                     <div class="band-shape-deck">
                         <div class="selected-band-header">
                             <span id="activeBandBadge" class="active-band-pill">BAND 3</span>
@@ -211,9 +250,8 @@
                         </select>
                     </div>
 
-                    <!-- Center/Right: 3 Studio Rotary Knobs (FREQ, GAIN, Q) -->
+                    <!-- 3 Rotary Knobs (FREQ, GAIN, Q) -->
                     <div class="rotary-knobs-cluster">
-                        <!-- FREQUENCY KNOB -->
                         <div class="param-knob-box">
                             <div class="knob-header">FREQUENCY</div>
                             <div class="rotary-knob-Interactive" id="knobFreq" data-param="freq" title="ลากขึ้น/ลง หรือหมุนลูกกลิ้งเมาส์">
@@ -229,7 +267,6 @@
                             <input type="range" id="paramFreqSlider" class="param-slider" min="0" max="1000" step="1" value="500">
                         </div>
 
-                        <!-- GAIN KNOB -->
                         <div class="param-knob-box">
                             <div class="knob-header">GAIN</div>
                             <div class="rotary-knob-Interactive" id="knobGain" data-param="gain" title="ลากขึ้น/ลง หรือแตะ 2 ครั้งเพื่อรีเซ็ตเป็น 0 dB">
@@ -245,7 +282,6 @@
                             <input type="range" id="paramGainSlider" class="param-slider" min="-18" max="18" step="0.5" value="0">
                         </div>
 
-                        <!-- Q (BANDWIDTH) KNOB -->
                         <div class="param-knob-box">
                             <div class="knob-header">Q (WIDTH)</div>
                             <div class="rotary-knob-Interactive" id="knobQ" data-param="q" title="ลากขึ้น/ลง (ค่าน้อย=กว้างนุ่มนวล, ค่ามาก=แคบเจาะจง)">
@@ -265,7 +301,7 @@
             </section>
 
             <!-- =====================================================
-                 GRAPHIC 10-BAND CONSOLE RACK
+                 STATION 3: GRAPHIC 10-BAND CONSOLE RACK
                  ===================================================== -->
             <section class="graphic-eq-rack" id="graphicEqRack" style="display: none;">
                 <div class="graphic-rack-header">
@@ -288,61 +324,7 @@
                 </div>
             </section>
         </div>
-
-        <!-- =========================================================
-             RIGHT PANE: STUDIO TONE INSPECTOR & SWEET SPOTS GUIDE
-             ========================================================= -->
-        <aside class="inspector-dock-pane" id="inspectorDockPane">
-            <!-- Studio Tone Guide Header -->
-            <div class="content-panel" id="dockPanelGuide">
-                <div class="panel-header">
-                    <div>
-                        <div class="panel-title" id="currentInstTitle">🥁 KICK</div>
-                        <div class="panel-desc" id="currentInstDesc">
-                            คำอธิบายและแนวทางการปรับแต่งเสียง
-                        </div>
-                    </div>
-                    <div class="guide-header-actions">
-                        <span class="panel-badge">Sweet Spots</span>
-                        <button type="button" id="toggleAllZonesBtn" class="btn-zone-expand" title="ขยาย/ยุบย่านเสียงทั้งหมด">
-                            <span id="toggleAllZonesIcon">📂</span> <span id="toggleAllZonesText">ขยายทุกย่าน</span>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Interactive Frequency Spectrum Strip (Quick Touch Selector) -->
-                <div class="zones-spectrum-wrap">
-                    <div class="zones-spectrum-label">⚡ แตะเลือกย่านเพื่อโฟกัสบนกราฟ:</div>
-                    <div class="zones-spectrum-track" id="zonesSpectrumTrack">
-                        <!-- Frequency chips injected by JS -->
-                    </div>
-                </div>
-
-                <div class="zones-guide-hint">
-                    ✨ <strong>แตะย่านความถี่หรือการ์ด</strong> เพื่อดูตำแหน่งบนกราฟ หรือกด <strong>+6dB / -6dB</strong> เพื่อฟังเสียงจริงทันที
-                </div>
-
-                <div class="zones-list" id="zonesList">
-                    <!-- Interactive Accordion Cards rendered dynamically -->
-                </div>
-            </div>
-        </aside>
     </main>
-
-    <!-- =========================================================
-         MOBILE PORTRAIT BOTTOM NAVIGATION BAR (QUICK VIEW SWITCHER)
-         ========================================================= -->
-    <nav class="mobile-bottom-nav" id="mobileBottomNav">
-        <button type="button" class="mob-nav-btn active" data-mobview="all">
-            <span>📱</span> <span>มุมมองรวม</span>
-        </button>
-        <button type="button" class="mob-nav-btn" data-mobview="eq">
-            <span>🎛️</span> <span>หน้าจอ EQ</span>
-        </button>
-        <button type="button" class="mob-nav-btn" data-mobview="guide">
-            <span>📖</span> <span>คู่มือย่านเสียง</span>
-        </button>
-    </nav>
 
     <!-- Drag & Drop Audio Upload Overlay -->
     <div id="dropOverlay" class="drop-overlay">
