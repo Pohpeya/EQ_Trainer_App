@@ -1,88 +1,63 @@
 /**
- * PRO-EQ Studio Trainer - Interactive Parametric & Graphic EQ Visualizer
- * Responsive for Desktop, Mobile Portrait & Mobile Landscape with Full Multi-Touch Support
+ * EQ Master Trainer - Interactive Spectrum Analyzer & Sweet-Spot Visualizer
+ * Fully responsive for Desktop, Mobile Portrait & Mobile Landscape with Multi-Touch Support
  */
 
-const BAND_COLORS = [
-    "#ff453a", // Band 1: Red (HPF / Sub)
-    "#ff9f0a", // Band 2: Orange (Low Shelf / Bass)
-    "#ffd60a", // Band 3: Yellow (Low-Mid)
-    "#30d158", // Band 4: Green (Mid)
-    "#00d2ff", // Band 5: Cyan (Upper-Mid)
-    "#5e5ce6", // Band 6: Indigo (Presence)
-    "#bf5af2", // Band 7: Purple (High Shelf / Air)
-    "#ff375f"  // Band 8: Pink-Red (LPF)
-];
-
 class EQCanvas {
-    constructor(canvas, audioEngine, onBandChange, onNodeSelect, onZoneClick, onGraphicChange) {
+    constructor(canvas, audioEngine, onSweetSpotChange, onHoverChange) {
         this.canvas = canvas;
         this.ctx = canvas.getContext("2d");
         this.audio = audioEngine;
-        this.onBandChange = onBandChange;
-        this.onNodeSelect = onNodeSelect;
-        this.onZoneClick = onZoneClick;
-        this.onGraphicChange = onGraphicChange;
+        this.onSweetSpotChange = onSweetSpotChange;
+        this.onHoverChange = onHoverChange;
 
-        this.width = canvas.width;
-        this.height = canvas.height;
-        this.paddingTop = 44;
-        this.paddingBottom = 24;
+        this.displayWidth = canvas.width;
+        this.displayHeight = canvas.height;
+        this.paddingTop = 46;
+        this.paddingBottom = 26;
 
         this.minFreq = 20;
         this.maxFreq = 20000;
-        this.minDb = -18;
-        this.maxDb = 18;
+        this.minDb = -12;
+        this.maxDb = 12;
 
-        this.selectedBand = 2;
-        this.hoveredBand = null;
+        this.activeZones = [];
+        this.hoveredIndex = -1;
+        this.draggedIndex = -1;
         this.isDragging = false;
-        this.dragStartX = 0;
-        this.dragStartY = 0;
 
-        // Touch gestures state (double-tap & 2-finger pinch for Q)
+        // Double-tap tracking for mobile
         this.lastTapTime = 0;
-        this.lastTapBand = null;
-        this.initialPinchDist = null;
-        this.initialPinchQ = 1.4;
+        this.lastTapIndex = -1;
 
-        // Graphic EQ drag state
-        this.selectedGraphicBand = null;
-        this.isDraggingGraphic = false;
+        // RTA smoothing buffers
+        this.numSpectrumPoints = 240;
+        this.spectrumPoints = new Float32Array(this.numSpectrumPoints);
+        this.peakHoldPoints = new Float32Array(this.numSpectrumPoints);
 
-        // Cursor position for live Pro-Q crosshair readout
-        this.cursorPos = null;
-        this.cursorReadoutEl = document.getElementById("cursorFreqReadout");
-
-        // Highlighted zone from hovering Guide cards or top zone bar
-        this.highlightedZone = null;
-
-        // Visual spectrum smoothing buffers & peak hold
-        this.spectrumPoints = new Float32Array(280);
-        this.peakHoldPoints = new Float32Array(280);
-
-        // Precalculated frequency array for filter response
-        this.numResponsePoints = 320;
+        // Precalculated frequency response points
+        this.numResponsePoints = 280;
         this.responseFreqs = new Float32Array(this.numResponsePoints);
         for (let i = 0; i < this.numResponsePoints; i++) {
             const frac = i / (this.numResponsePoints - 1);
             this.responseFreqs[i] = this.minFreq * Math.pow(this.maxFreq / this.minFreq, frac);
         }
 
-        // Active instrument zones for overlay
-        this.activeZones = [];
+        this.cursorReadoutEl = document.getElementById("cursorFreqReadout");
 
         this.initEvents();
         this.resize();
     }
 
-    setDbRange(rangeDb) {
-        this.minDb = -rangeDb;
-        this.maxDb = rangeDb;
+    setZones(zones) {
+        this.activeZones = zones || [];
+        this.hoveredIndex = -1;
+        this.draggedIndex = -1;
+        this.isDragging = false;
     }
 
-    setHighlightedZone(zone) {
-        this.highlightedZone = zone || null;
+    setHoveredIndex(index) {
+        this.hoveredIndex = index;
     }
 
     resize() {
@@ -91,26 +66,16 @@ class EQCanvas {
         const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
         this.canvas.width = Math.round(rect.width * dpr);
         this.canvas.height = Math.round(rect.height * dpr);
-        this.width = this.canvas.width;
-        this.height = this.canvas.height;
         this.ctx.setTransform(1, 0, 0, 1, 0, 0);
         this.ctx.scale(dpr, dpr);
         this.displayWidth = rect.width;
         this.displayHeight = rect.height;
 
-        // Adjust top/bottom padding compactly on smaller mobile screens
-        const isCompact = (rect.height < 250 || rect.width < 520);
+        const isCompact = (rect.height < 240 || rect.width < 500);
         this.paddingTop = isCompact ? 38 : 46;
-        this.paddingBottom = isCompact ? 20 : 25;
+        this.paddingBottom = isCompact ? 20 : 26;
     }
 
-    setActiveZones(zones) {
-        this.activeZones = zones || [];
-    }
-
-    // -------------------------------------------------------------
-    // COORDINATE & MUSICAL PITCH CONVERSIONS
-    // -------------------------------------------------------------
     freqToX(freq) {
         const minLog = Math.log10(this.minFreq);
         const maxLog = Math.log10(this.maxFreq);
@@ -139,577 +104,214 @@ class EQCanvas {
         return Math.max(this.minDb, Math.min(this.maxDb, db));
     }
 
-    freqToMusicalNote(freq) {
-        if (freq < 20 || freq > 20000) return "";
-        const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-        const midi = Math.round(12 * Math.log2(freq / 440) + 69);
-        if (midi < 12 || midi > 127) return "";
-        const note = noteNames[midi % 12];
-        const octave = Math.floor(midi / 12) - 1;
-        return `${note}${octave}`;
-    }
-
-    parseZoneRange(rangeStr) {
-        if (!rangeStr) return null;
-        const parts = rangeStr.match(/([\d\.]+)\s*(k?Hz)\s*-\s*([\d\.]+)\s*(k?Hz)/i);
-        if (!parts) return null;
-        const f1 = parseFloat(parts[1]) * (parts[2].toLowerCase() === "khz" ? 1000 : 1);
-        const f2 = parseFloat(parts[3]) * (parts[4].toLowerCase() === "khz" ? 1000 : 1);
-        return { f1, f2 };
-    }
-
-    // -------------------------------------------------------------
-    // EVENT HANDLING (MOUSE + MOBILE TOUCH + ORIENTATION RESIZE)
-    // -------------------------------------------------------------
     initEvents() {
-        window.addEventListener("resize", () => this.resize());
-        window.addEventListener("orientationchange", () => {
-            setTimeout(() => this.resize(), 120);
-            setTimeout(() => this.resize(), 350);
-        });
+        const c = this.canvas;
 
-        // Observe wrapper size changes (e.g. layout shifts or tab switches)
-        if (typeof ResizeObserver !== "undefined" && this.canvas.parentElement) {
-            const ro = new ResizeObserver(() => this.resize());
-            ro.observe(this.canvas.parentElement);
-        }
-
-        // Mouse Events
-        this.canvas.addEventListener("mousedown", (e) => this.handleMouseDown(e, false));
-        window.addEventListener("mousemove", (e) => this.handleMouseMove(e));
-        window.addEventListener("mouseup", () => this.handleMouseUp());
-        this.canvas.addEventListener("mouseleave", () => {
-            this.cursorPos = null;
-            if (!this.isDragging) this.hoveredBand = null;
-            if (this.cursorReadoutEl) this.cursorReadoutEl.textContent = "--- Hz | -- dB";
-        });
-        this.canvas.addEventListener("wheel", (e) => this.handleWheel(e), { passive: false });
-        this.canvas.addEventListener("dblclick", (e) => this.handleDblClick(e));
-
-        // Mobile Touch Events (1-finger drag, double-tap reset, 2-finger pinch Q)
-        this.canvas.addEventListener("touchstart", (e) => {
-            if (e.touches.length === 2 && this.audio.eqMode === "parametric") {
-                // 2-finger pinch to adjust Q bandwidth on mobile
-                e.preventDefault();
-                this.isDragging = false;
-                const dx = e.touches[0].clientX - e.touches[1].clientX;
-                const dy = e.touches[0].clientY - e.touches[1].clientY;
-                this.initialPinchDist = Math.hypot(dx, dy);
-                const targetIdx = this.selectedBand !== null ? this.selectedBand : 2;
-                this.initialPinchQ = this.audio.bands[targetIdx].q;
-                return;
-            }
-
-            if (e.touches.length === 1) {
-                const touch = e.touches[0];
-                const mouseEvent = { clientX: touch.clientX, clientY: touch.clientY };
-                const handled = this.handleMouseDown(mouseEvent, true);
-                if (handled) {
-                    e.preventDefault(); // Prevent page scrolling while dragging an EQ node
-                }
-            }
-        }, { passive: false });
-
-        window.addEventListener("touchmove", (e) => {
-            if (e.touches.length === 2 && this.initialPinchDist && this.audio.eqMode === "parametric") {
-                e.preventDefault();
-                const dx = e.touches[0].clientX - e.touches[1].clientX;
-                const dy = e.touches[0].clientY - e.touches[1].clientY;
-                const dist = Math.hypot(dx, dy);
-                const scale = this.initialPinchDist / Math.max(20, dist);
-                const targetIdx = this.selectedBand !== null ? this.selectedBand : 2;
-                const newQ = Math.max(0.2, Math.min(10, this.initialPinchQ * scale));
-                this.audio.updateBand(targetIdx, { q: Math.round(newQ * 100) / 100 });
-                if (this.onBandChange) {
-                    this.onBandChange(targetIdx, this.audio.bands[targetIdx]);
-                }
-                return;
-            }
-
-            if ((this.isDragging || this.isDraggingGraphic) && e.touches.length === 1) {
-                e.preventDefault();
-                const touch = e.touches[0];
-                this.handleMouseMove({ clientX: touch.clientX, clientY: touch.clientY });
-            }
-        }, { passive: false });
-
-        window.addEventListener("touchend", () => {
-            this.initialPinchDist = null;
-            this.handleMouseUp();
-        });
-    }
-
-    getCanvasPos(e) {
-        const rect = this.canvas.getBoundingClientRect();
-        return {
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top
+        const getPos = (e) => {
+            const rect = c.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
         };
-    }
 
-    findBandUnderPointer(pos, isTouch = false) {
-        const radius = isTouch ? 28 : 16; // Larger hit target for mobile touch
-        let closestIdx = null;
-        let minDist = radius;
-        for (let i = 0; i < this.audio.bands.length; i++) {
-            const b = this.audio.bands[i];
-            const bx = this.freqToX(b.freq);
-            const by = this.dbToY(b.gain);
-            const dist = Math.hypot(pos.x - bx, pos.y - by);
-            if (dist <= minDist) {
-                minDist = dist;
-                closestIdx = i;
-            }
-        }
-        return closestIdx;
-    }
+        const findNearestZone = (x, y) => {
+            if (!this.activeZones || this.activeZones.length === 0) return -1;
+            let bestIdx = -1;
+            let minDistance = Infinity;
 
-    handleMouseDown(e, isTouch = false) {
-        const pos = this.getCanvasPos(e);
+            for (let i = 0; i < this.activeZones.length; i++) {
+                const z = this.activeZones[i];
+                const nodeX = this.freqToX(z.centerFreq);
+                const currentGain = (this.audio.bands[i] ? this.audio.bands[i].gain : 0);
+                const nodeY = this.dbToY(currentGain);
 
-        // Check if clicked in top sweet-spot zone bar
-        if (pos.y >= 16 && pos.y <= this.paddingTop && this.activeZones && this.activeZones.length > 0) {
-            for (let zone of this.activeZones) {
-                const parsed = this.parseZoneRange(zone.range);
-                if (parsed) {
-                    const x1 = Math.max(0, this.freqToX(parsed.f1));
-                    const x2 = Math.min(this.displayWidth, this.freqToX(parsed.f2));
-                    if (pos.x >= x1 && pos.x <= x2) {
-                        if (this.onZoneClick) {
-                            this.onZoneClick(zone);
-                            return true;
-                        }
-                    }
+                const dx = x - nodeX;
+                const dy = y - nodeY;
+                const distNode = Math.sqrt(dx * dx + dy * dy);
+
+                // Check distance to node handle (radius 36px) or proximity to vertical target line (30px)
+                if (distNode < 36 && distNode < minDistance) {
+                    minDistance = distNode;
+                    bestIdx = i;
+                } else if (Math.abs(dx) < 28 && Math.abs(dx) < minDistance) {
+                    minDistance = Math.abs(dx);
+                    bestIdx = i;
                 }
             }
-        }
+            return bestIdx;
+        };
 
-        // Check if in Graphic EQ mode
-        if (this.audio.eqMode === "graphic") {
-            const freqs = this.audio.graphicFreqs;
-            const hitWidth = isTouch ? 30 : 24;
-            for (let i = 0; i < freqs.length; i++) {
-                const bx = this.freqToX(freqs[i]);
-                if (Math.abs(pos.x - bx) <= hitWidth) {
-                    this.selectedGraphicBand = i;
-                    this.isDraggingGraphic = true;
-                    const newGain = Math.max(-12, Math.min(12, this.yToDb(pos.y)));
-                    this.audio.setGraphicGain(i, newGain);
-                    if (this.onGraphicChange) this.onGraphicChange(i, newGain);
-                    return true;
+        // Pointer Move
+        const onMove = (e) => {
+            const pos = getPos(e);
+            const freq = this.xToFreq(pos.x);
+            const db = this.yToDb(pos.y);
+
+            if (this.cursorReadoutEl) {
+                const freqStr = freq >= 1000 ? (freq / 1000).toFixed(2) + " kHz" : Math.round(freq) + " Hz";
+                const dbStr = (db >= 0 ? "+" : "") + db.toFixed(1) + " dB";
+                this.cursorReadoutEl.textContent = `${freqStr} | ${dbStr}`;
+            }
+
+            if (this.isDragging && this.draggedIndex !== -1) {
+                if (e.cancelable) e.preventDefault();
+                const newGain = Math.round(this.yToDb(pos.y) * 2) / 2; // snap to 0.5 dB
+                const clamped = Math.max(-12, Math.min(12, newGain));
+                if (this.onSweetSpotChange) {
+                    this.onSweetSpotChange(this.draggedIndex, clamped);
+                }
+            } else {
+                const hovered = findNearestZone(pos.x, pos.y);
+                if (hovered !== this.hoveredIndex) {
+                    this.hoveredIndex = hovered;
+                    if (this.onHoverChange) this.onHoverChange(hovered);
+                    c.style.cursor = hovered !== -1 ? "ns-resize" : "crosshair";
                 }
             }
-            return false;
-        }
+        };
 
-        const bandIdx = this.findBandUnderPointer(pos, isTouch);
-        if (bandIdx !== null) {
+        // Pointer Down
+        const onStart = (e) => {
+            const pos = getPos(e);
+            const nearest = findNearestZone(pos.x, pos.y);
+
+            // Double tap check
             const now = Date.now();
-            // Double-tap on mobile resets gain to 0 dB
-            if (isTouch && this.lastTapBand === bandIdx && (now - this.lastTapTime) < 320) {
-                this.audio.updateBand(bandIdx, { gain: 0 });
-                if (this.onBandChange) {
-                    this.onBandChange(bandIdx, this.audio.bands[bandIdx]);
+            if (nearest !== -1 && nearest === this.lastTapIndex && (now - this.lastTapTime) < 320) {
+                // Reset this zone to 0 dB
+                if (this.onSweetSpotChange) {
+                    this.onSweetSpotChange(nearest, 0);
                 }
                 this.lastTapTime = 0;
-                return true;
+                this.lastTapIndex = -1;
+                return;
             }
             this.lastTapTime = now;
-            this.lastTapBand = bandIdx;
+            this.lastTapIndex = nearest;
 
-            this.selectedBand = bandIdx;
-            this.isDragging = true;
-            this.dragStartX = pos.x;
-            this.dragStartY = pos.y;
-            if (this.onNodeSelect) this.onNodeSelect(bandIdx);
-            return true;
-        }
-        return false;
-    }
+            if (nearest !== -1) {
+                if (e.cancelable) e.preventDefault();
+                this.isDragging = true;
+                this.draggedIndex = nearest;
+                this.hoveredIndex = nearest;
+                c.style.cursor = "ns-resize";
 
-    handleMouseMove(e) {
-        const rect = this.canvas.getBoundingClientRect();
-        const isInside = (
-            e.clientX >= rect.left &&
-            e.clientX <= rect.right &&
-            e.clientY >= rect.top &&
-            e.clientY <= rect.bottom
-        );
-        const pos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-
-        if (isInside) {
-            this.cursorPos = pos;
-            const cFreq = this.xToFreq(pos.x);
-            const cDb = this.yToDb(pos.y);
-            const note = this.freqToMusicalNote(cFreq);
-            const freqStr = cFreq >= 1000 ? (cFreq / 1000).toFixed(2) + " kHz" : Math.round(cFreq) + " Hz";
-            const dbStr = (cDb > 0 ? "+" : "") + cDb.toFixed(1) + " dB";
-            if (this.cursorReadoutEl) {
-                this.cursorReadoutEl.textContent = `${freqStr} (${note}) | ${dbStr}`;
-            }
-        }
-
-        if (this.isDraggingGraphic && this.selectedGraphicBand !== null) {
-            const newGain = Math.max(-12, Math.min(12, this.yToDb(pos.y)));
-            this.audio.setGraphicGain(this.selectedGraphicBand, newGain);
-            if (this.onGraphicChange) this.onGraphicChange(this.selectedGraphicBand, newGain);
-            return;
-        }
-
-        if (this.isDragging && this.selectedBand !== null) {
-            const b = this.audio.bands[this.selectedBand];
-            let newFreq = this.xToFreq(pos.x);
-            let newGain = Math.max(-18, Math.min(18, this.yToDb(pos.y)));
-
-            if (b.type === "highpass" || b.type === "lowpass") {
-                newGain = 0;
-            }
-
-            if (!b.enabled) {
-                this.audio.updateBand(this.selectedBand, { enabled: true });
-            }
-
-            this.audio.updateBand(this.selectedBand, {
-                freq: newFreq,
-                gain: newGain
-            });
-
-            if (this.onBandChange) {
-                this.onBandChange(this.selectedBand, this.audio.bands[this.selectedBand]);
-            }
-        } else if (isInside) {
-            const hovered = this.findBandUnderPointer(pos, false);
-            this.hoveredBand = hovered;
-            if (pos.y >= 16 && pos.y <= this.paddingTop) {
-                this.canvas.style.cursor = "pointer";
-            } else {
-                this.canvas.style.cursor = (hovered !== null) ? "grab" : "crosshair";
-            }
-        }
-    }
-
-    handleMouseUp() {
-        this.isDragging = false;
-        this.isDraggingGraphic = false;
-        this.selectedGraphicBand = null;
-        if (this.hoveredBand !== null) {
-            this.canvas.style.cursor = "grab";
-        }
-    }
-
-    handleWheel(e) {
-        const targetBand = (this.hoveredBand !== null) ? this.hoveredBand : this.selectedBand;
-        if (targetBand !== null && this.audio.eqMode === "parametric") {
-            e.preventDefault();
-            const b = this.audio.bands[targetBand];
-            const delta = e.deltaY > 0 ? -0.18 : 0.18;
-            let newQ = Math.max(0.2, Math.min(10, b.q + delta));
-            this.audio.updateBand(targetBand, { q: newQ });
-            if (this.onBandChange) {
-                this.onBandChange(targetBand, this.audio.bands[targetBand]);
-            }
-        }
-    }
-
-    handleDblClick(e) {
-        const pos = this.getCanvasPos(e);
-        if (this.audio.eqMode === "graphic") {
-            const freqs = this.audio.graphicFreqs;
-            for (let i = 0; i < freqs.length; i++) {
-                const bx = this.freqToX(freqs[i]);
-                if (Math.abs(pos.x - bx) <= 24) {
-                    this.audio.setGraphicGain(i, 0);
-                    if (this.onGraphicChange) this.onGraphicChange(i, 0);
-                    return;
+                // Immediate gain adjust on touch/click
+                const newGain = Math.round(this.yToDb(pos.y) * 2) / 2;
+                const clamped = Math.max(-12, Math.min(12, newGain));
+                if (this.onSweetSpotChange) {
+                    this.onSweetSpotChange(nearest, clamped);
                 }
             }
-            return;
-        }
+        };
 
-        const bandIdx = this.findBandUnderPointer(pos, false);
-        if (bandIdx !== null) {
-            this.audio.updateBand(bandIdx, { gain: 0 });
-            if (this.onBandChange) {
-                this.onBandChange(bandIdx, this.audio.bands[bandIdx]);
+        // Pointer Up
+        const onEnd = () => {
+            this.isDragging = false;
+            this.draggedIndex = -1;
+            c.style.cursor = this.hoveredIndex !== -1 ? "ns-resize" : "crosshair";
+        };
+
+        c.addEventListener("mousedown", onStart);
+        window.addEventListener("mousemove", onMove);
+        window.addEventListener("mouseup", onEnd);
+
+        c.addEventListener("touchstart", onStart, { passive: false });
+        window.addEventListener("touchmove", onMove, { passive: false });
+        window.addEventListener("touchend", onEnd);
+        window.addEventListener("touchcancel", onEnd);
+
+        c.addEventListener("dblclick", (e) => {
+            const pos = getPos(e);
+            const nearest = findNearestZone(pos.x, pos.y);
+            if (nearest !== -1 && this.onSweetSpotChange) {
+                this.onSweetSpotChange(nearest, 0);
             }
-        }
+        });
+
+        window.addEventListener("resize", () => {
+            this.resize();
+        });
     }
 
-    // -------------------------------------------------------------
-    // MAIN 60FPS RENDER PIPELINE
-    // -------------------------------------------------------------
     draw() {
         const ctx = this.ctx;
         const w = this.displayWidth;
         const h = this.displayHeight;
 
-        if (!w || !h) {
-            requestAnimationFrame(() => this.draw());
-            return;
-        }
-
         ctx.clearRect(0, 0, w, h);
 
-        // 1. Logarithmic Studio Grid & Acoustic Sub-Band Header
+        // 1. Draw Background Grid & Frequency Labels
         this.drawGrid(ctx, w, h);
 
-        // 2. Highlighted Zone Spotlight (when hovering guide card)
-        this.drawHighlightedZoneSpotlight(ctx, w, h);
-
-        // 3. Real-Time FFT Spectrum Analyzer + Peak Hold
+        // 2. Draw Real-Time RTA Spectrum (if playing)
         this.drawSpectrum(ctx, w, h);
 
-        // 4. Top Instrument Sweet-Spot Zones Bar
-        this.drawZoneOverlay(ctx, w, h);
+        // 3. Draw Composite EQ Curve
+        this.drawMasterEQCurve(ctx, w, h);
 
-        // 5. Individual Per-Band Shaded Curves (Pro-Q 3 / Logic Channel EQ style)
-        if (this.audio.eqMode === "parametric" && !this.audio.isBypassed) {
-            this.drawIndividualBandCurves(ctx, w, h);
-        }
-
-        // 6. Master Composite EQ Curve
-        this.drawEQResponseCurve(ctx, w, h);
-
-        // 7. Live Cursor Crosshair
-        this.drawCursorCrosshair(ctx, w, h);
-
-        // 8. Interactive Filter Nodes
-        this.drawBandNodes(ctx, w, h);
-
-        requestAnimationFrame(() => this.draw());
+        // 4. Draw Sweet-Spot Target Lines & Interactive Pin Callouts
+        this.drawSweetSpots(ctx, w, h);
     }
 
-    // -------------------------------------------------------------
-    // 1. STUDIO LOGARITHMIC GRID & SUB-BAND HEADER
-    // -------------------------------------------------------------
     drawGrid(ctx, w, h) {
+        const usableH = h - this.paddingTop - this.paddingBottom;
+        const zeroY = this.paddingTop + usableH / 2;
+
         ctx.save();
-        const isNarrow = (w < 540);
 
-        // Top Acoustic Sub-Bands Reference Bar
-        const acousticBands = [
-            { name: isNarrow ? "SUB" : "SUB BASS", f1: 20, f2: 60, color: "rgba(255, 69, 58, 0.08)" },
-            { name: "BASS", f1: 60, f2: 250, color: "rgba(255, 159, 10, 0.08)" },
-            { name: isNarrow ? "L-MID" : "LOW MID", f1: 250, f2: 500, color: "rgba(255, 214, 10, 0.07)" },
-            { name: isNarrow ? "MID" : "MIDRANGE", f1: 500, f2: 2000, color: "rgba(48, 209, 88, 0.07)" },
-            { name: isNarrow ? "H-MID" : "UPPER MID", f1: 2000, f2: 4000, color: "rgba(0, 210, 255, 0.08)" },
-            { name: isNarrow ? "PRES" : "PRESENCE", f1: 4000, f2: 6000, color: "rgba(94, 92, 230, 0.08)" },
-            { name: isNarrow ? "AIR" : "BRILLIANCE / AIR", f1: 6000, f2: 20000, color: "rgba(191, 90, 242, 0.08)" }
-        ];
+        // Background dark gradient
+        const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
+        bgGrad.addColorStop(0, "#0b0f19");
+        bgGrad.addColorStop(1, "#070a10");
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, w, h);
 
-        const barH = isNarrow ? 16 : 19;
-        acousticBands.forEach(ab => {
-            const x1 = this.freqToX(ab.f1);
-            const x2 = this.freqToX(ab.f2);
-            ctx.fillStyle = ab.color;
-            ctx.fillRect(x1, 0, x2 - x1, barH);
-
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(x2, 0);
-            ctx.lineTo(x2, barH);
-            ctx.stroke();
-
-            if (x2 - x1 > 26) {
-                ctx.fillStyle = "rgba(255, 255, 255, 0.45)";
-                ctx.font = `600 ${isNarrow ? 8 : 9}px 'JetBrains Mono', monospace`;
-                ctx.textAlign = "center";
-                ctx.fillText(ab.name, (x1 + x2) / 2, isNarrow ? 11 : 13);
-            }
-        });
-
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
-        ctx.beginPath();
-        ctx.moveTo(0, barH);
-        ctx.lineTo(w, barH);
-        ctx.stroke();
-
-        // Minor Logarithmic Vertical Lines
-        const minorFreqs = [
-            30, 40, 60, 70, 80, 90,
-            300, 400, 600, 700, 800, 900,
-            3000, 4000, 6000, 7000, 8000, 9000
-        ];
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.028)";
+        // Frequency Grid Lines
+        const freqs = [30, 60, 120, 250, 500, 1000, 2000, 4000, 8000, 16000];
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
         ctx.lineWidth = 1;
-        minorFreqs.forEach(f => {
-            const x = Math.round(this.freqToX(f)) + 0.5;
-            ctx.beginPath();
-            ctx.moveTo(x, this.paddingTop);
-            ctx.lineTo(x, h - this.paddingBottom);
-            ctx.stroke();
-        });
+        ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
+        ctx.font = "500 10px 'JetBrains Mono', monospace";
+        ctx.textAlign = "center";
 
-        // Major Logarithmic Vertical Lines & Bottom Labels
-        const majorFreqs = [
-            { f: 20, l: "20" },
-            { f: 50, l: "50" },
-            { f: 100, l: "100" },
-            { f: 200, l: "200" },
-            { f: 500, l: "500" },
-            { f: 1000, l: "1k" },
-            { f: 2000, l: "2k" },
-            { f: 5000, l: "5k" },
-            { f: 10000, l: "10k" },
-            { f: 20000, l: "20k" }
-        ];
-
-        majorFreqs.forEach(item => {
-            const x = Math.round(this.freqToX(item.f)) + 0.5;
-            const isDecade = (item.f === 100 || item.f === 1000 || item.f === 10000);
-            ctx.strokeStyle = isDecade ? "rgba(255, 255, 255, 0.11)" : "rgba(255, 255, 255, 0.055)";
+        freqs.forEach(f => {
+            const x = Math.round(this.freqToX(f));
             ctx.beginPath();
-            ctx.moveTo(x, this.paddingTop);
-            ctx.lineTo(x, h - this.paddingBottom);
+            ctx.moveTo(x, this.paddingTop - 10);
+            ctx.lineTo(x, h - this.paddingBottom + 4);
             ctx.stroke();
 
-            ctx.fillStyle = isDecade ? "rgba(255, 255, 255, 0.72)" : "rgba(255, 255, 255, 0.42)";
-            ctx.font = `${isDecade ? 600 : 400} ${isNarrow ? 8.5 : 10}px 'JetBrains Mono', monospace`;
-            ctx.textAlign = (item.f === 20) ? "left" : (item.f === 20000 ? "right" : "center");
-            const labelX = (item.f === 20) ? x + 3 : (item.f === 20000 ? x - 3 : x);
-            ctx.fillText(item.l, labelX, h - (isNarrow ? 6 : 8));
+            const lbl = f >= 1000 ? `${f / 1000}k` : `${f}`;
+            ctx.fillText(lbl, x, h - 8);
         });
 
-        // Horizontal dB Grid Lines
-        const step = this.maxDb === 12 ? 3 : (this.maxDb === 30 ? 10 : 6);
-        const dbMarks = [];
-        for (let db = this.maxDb; db >= this.minDb; db -= step) {
-            dbMarks.push(db);
-        }
-
-        dbMarks.forEach(db => {
-            const y = Math.round(this.dbToY(db)) + 0.5;
+        // dB Horizontal Lines (-12, -6, 0, +6, +12)
+        const dbs = [-12, -6, 0, 6, 12];
+        dbs.forEach(db => {
+            const y = Math.round(this.dbToY(db));
             const isZero = (db === 0);
-            ctx.strokeStyle = isZero ? "rgba(255, 255, 255, 0.28)" : "rgba(255, 255, 255, 0.05)";
-            ctx.lineWidth = isZero ? 1.2 : 1;
 
             ctx.beginPath();
             ctx.moveTo(0, y);
             ctx.lineTo(w, y);
+            ctx.strokeStyle = isZero ? "rgba(255, 255, 255, 0.22)" : "rgba(255, 255, 255, 0.04)";
+            ctx.lineWidth = isZero ? 1.4 : 1;
             ctx.stroke();
 
-            ctx.fillStyle = isZero ? "rgba(255, 255, 255, 0.85)" : "rgba(255, 255, 255, 0.35)";
-            ctx.font = `500 ${isNarrow ? 8.5 : 9.5}px 'JetBrains Mono', monospace`;
-            ctx.textAlign = "right";
-            ctx.fillText((db > 0 ? "+" : "") + db + (isNarrow ? "" : " dB"), w - 6, y - 3);
+            // dB labels on both edges
+            ctx.fillStyle = isZero ? "rgba(255, 255, 255, 0.7)" : "rgba(255, 255, 255, 0.28)";
+            ctx.font = isZero ? "700 9.5px 'JetBrains Mono', monospace" : "500 9px 'JetBrains Mono', monospace";
+            ctx.textAlign = "left";
+            ctx.fillText(`${db > 0 ? "+" : ""}${db} dB`, 6, y - 3);
         });
 
         ctx.restore();
     }
 
-    // -------------------------------------------------------------
-    // 2. SPOTLIGHT WHEN HOVERING GUIDE ZONE
-    // -------------------------------------------------------------
-    drawHighlightedZoneSpotlight(ctx, w, h) {
-        if (!this.highlightedZone) return;
-        const parsed = this.parseZoneRange(this.highlightedZone.range);
-        if (!parsed) return;
-
-        const x1 = Math.max(0, this.freqToX(parsed.f1));
-        const x2 = Math.min(w, this.freqToX(parsed.f2));
-        const zw = Math.max(4, x2 - x1);
-        const color = this.highlightedZone.color || "#00d2ff";
-
-        ctx.save();
-        const grad = ctx.createLinearGradient(0, this.paddingTop, 0, h - this.paddingBottom);
-        grad.addColorStop(0, color + "33");
-        grad.addColorStop(0.5, color + "18");
-        grad.addColorStop(1, color + "33");
-        ctx.fillStyle = grad;
-        ctx.fillRect(x1, this.paddingTop, zw, h - this.paddingTop - this.paddingBottom);
-
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.moveTo(x1, this.paddingTop);
-        ctx.lineTo(x1, h - this.paddingBottom);
-        ctx.moveTo(x2, this.paddingTop);
-        ctx.lineTo(x2, h - this.paddingBottom);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        const label = `🎯 ${this.highlightedZone.name.split("(")[0].trim()} (${this.highlightedZone.range})`;
-        ctx.font = "600 10.5px 'Prompt', sans-serif";
-        const tw = Math.min(w - 24, ctx.measureText(label).width);
-        const cx = Math.max(tw / 2 + 12, Math.min(w - tw / 2 - 12, (x1 + x2) / 2));
-
-        ctx.fillStyle = "rgba(10, 14, 22, 0.92)";
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1.2;
-        if (ctx.roundRect) {
-            ctx.beginPath();
-            ctx.roundRect(cx - tw / 2 - 8, this.paddingTop + 8, tw + 16, 22, 5);
-            ctx.fill();
-            ctx.stroke();
-        }
-        ctx.fillStyle = "#ffffff";
-        ctx.textAlign = "center";
-        ctx.fillText(label, cx, this.paddingTop + 23);
-
-        ctx.restore();
-    }
-
-    // -------------------------------------------------------------
-    // 3. TOP INSTRUMENT SWEET-SPOT PILLS BAR
-    // -------------------------------------------------------------
-    drawZoneOverlay(ctx, w, h) {
-        if (!this.activeZones || this.activeZones.length === 0) return;
-        ctx.save();
-        const isNarrow = (w < 540);
-        const pillTop = isNarrow ? 18 : 22;
-        const pillH = isNarrow ? 17 : 20;
-
-        this.activeZones.forEach(zone => {
-            const parsed = this.parseZoneRange(zone.range);
-            if (!parsed) return;
-
-            const x1 = Math.max(2, this.freqToX(parsed.f1));
-            const x2 = Math.min(w - 2, this.freqToX(parsed.f2));
-            const zoneWidth = Math.max(4, x2 - x1);
-            const isHighlighted = (this.highlightedZone === zone);
-            const color = zone.color || "#00d2ff";
-
-            ctx.fillStyle = color;
-            ctx.globalAlpha = isHighlighted ? 0.36 : 0.16;
-            if (ctx.roundRect) {
-                ctx.beginPath();
-                ctx.roundRect(x1, pillTop, zoneWidth, pillH, 4);
-                ctx.fill();
-            } else {
-                ctx.fillRect(x1, pillTop, zoneWidth, pillH);
-            }
-
-            ctx.globalAlpha = isHighlighted ? 1.0 : 0.75;
-            ctx.strokeStyle = color;
-            ctx.lineWidth = isHighlighted ? 1.6 : 1;
-            if (ctx.roundRect) {
-                ctx.beginPath();
-                ctx.roundRect(x1, pillTop, zoneWidth, pillH, 4);
-                ctx.stroke();
-            }
-
-            if (zoneWidth > 32) {
-                ctx.globalAlpha = 0.95;
-                ctx.fillStyle = "#ffffff";
-                ctx.font = `600 ${isNarrow ? 8.5 : 9.5}px 'Prompt', sans-serif`;
-                ctx.textAlign = "center";
-                let cleanName = zone.name.split("(")[0].trim();
-                const maxChars = Math.max(4, Math.floor(zoneWidth / (isNarrow ? 6 : 7)));
-                if (cleanName.length > maxChars) {
-                    cleanName = cleanName.substring(0, maxChars - 1) + "…";
-                }
-                ctx.fillText(cleanName, (x1 + x2) / 2, pillTop + (isNarrow ? 11.5 : 13.5));
-            }
-        });
-
-        ctx.restore();
-    }
-
-    // -------------------------------------------------------------
-    // 4. REAL-TIME FFT SPECTRUM + PEAK HOLD TRACE
-    // -------------------------------------------------------------
     drawSpectrum(ctx, w, h) {
         if (!this.audio.analyser) return;
 
@@ -725,7 +327,6 @@ class EQCanvas {
         const usableH = h - this.paddingTop - this.paddingBottom;
 
         ctx.save();
-
         ctx.beginPath();
         ctx.moveTo(0, bottomY);
 
@@ -738,6 +339,7 @@ class EQCanvas {
             const interp = exactBin - b0;
             const rawVal = ((dataArray[b0] * (1 - interp)) + (dataArray[b1] * interp)) / 255.0;
 
+            // Attack & release smoothing
             this.spectrumPoints[i] = rawVal > this.spectrumPoints[i]
                 ? rawVal * 0.65 + this.spectrumPoints[i] * 0.35
                 : this.spectrumPoints[i] * 0.91;
@@ -745,114 +347,47 @@ class EQCanvas {
             if (this.spectrumPoints[i] >= this.peakHoldPoints[i]) {
                 this.peakHoldPoints[i] = this.spectrumPoints[i];
             } else {
-                this.peakHoldPoints[i] = Math.max(0, this.peakHoldPoints[i] - 0.0022);
+                this.peakHoldPoints[i] = Math.max(0, this.peakHoldPoints[i] - 0.002);
             }
 
             const x = frac * w;
-            const y = bottomY - (this.spectrumPoints[i] * usableH * 0.88);
+            const y = bottomY - (this.spectrumPoints[i] * usableH * 0.92);
             ctx.lineTo(x, y);
         }
 
         ctx.lineTo(w, bottomY);
         ctx.closePath();
 
-        const grad = ctx.createLinearGradient(0, this.paddingTop, 0, bottomY);
-        grad.addColorStop(0, "rgba(0, 210, 255, 0.32)");
-        grad.addColorStop(0.55, "rgba(88, 86, 214, 0.16)");
-        grad.addColorStop(1, "rgba(15, 20, 32, 0.02)");
-        ctx.fillStyle = grad;
+        // Neon teal/cyan spectrum fill
+        const specGrad = ctx.createLinearGradient(0, this.paddingTop, 0, bottomY);
+        specGrad.addColorStop(0, "rgba(0, 229, 255, 0.38)");
+        specGrad.addColorStop(0.5, "rgba(0, 210, 150, 0.22)");
+        specGrad.addColorStop(1, "rgba(0, 160, 120, 0.02)");
+        ctx.fillStyle = specGrad;
         ctx.fill();
 
-        ctx.strokeStyle = "rgba(0, 220, 255, 0.62)";
-        ctx.lineWidth = 1.4;
-        ctx.stroke();
-
-        // Peak Hold Trace Line
-        ctx.beginPath();
-        for (let i = 0; i < numPoints; i++) {
-            const x = (i / (numPoints - 1)) * w;
-            const y = bottomY - (this.peakHoldPoints[i] * usableH * 0.88);
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-        }
-        ctx.strokeStyle = "rgba(0, 210, 255, 0.24)";
-        ctx.lineWidth = 1;
+        // Stroke line on top of spectrum
+        ctx.strokeStyle = "rgba(0, 240, 255, 0.55)";
+        ctx.lineWidth = 1.2;
         ctx.stroke();
 
         ctx.restore();
     }
 
-    // -------------------------------------------------------------
-    // 5. INDIVIDUAL PER-BAND SHADED CURVES (FabFilter / Logic EQ style)
-    // -------------------------------------------------------------
-    drawIndividualBandCurves(ctx, w, h) {
-        const nodes = this.audio.filterNodes;
-        if (!nodes || nodes.length === 0) return;
-
-        const numPoints = this.numResponsePoints;
-        const tempMag = new Float32Array(numPoints);
-        const tempPhase = new Float32Array(numPoints);
-        const zeroY = this.dbToY(0);
-
-        ctx.save();
-        for (let b = 0; b < nodes.length; b++) {
-            const band = this.audio.bands[b];
-            if (!band || !band.enabled) continue;
-
-            const isActiveFilter = (band.type === "highpass" && band.freq > 22) ||
-                                   (band.type === "lowpass" && band.freq < 19500) ||
-                                   (Math.abs(band.gain) >= 0.15) ||
-                                   (this.selectedBand === b) ||
-                                   (this.hoveredBand === b);
-
-            if (!isActiveFilter) continue;
-
-            nodes[b].getFrequencyResponse(this.responseFreqs, tempMag, tempPhase);
-            const color = BAND_COLORS[b % BAND_COLORS.length];
-            const isFocused = (this.selectedBand === b || this.hoveredBand === b);
-
-            ctx.beginPath();
-            for (let i = 0; i < numPoints; i++) {
-                const db = 20 * Math.log10(Math.max(0.0001, tempMag[i]));
-                const x = this.freqToX(this.responseFreqs[i]);
-                const y = this.dbToY(db);
-                if (i === 0) ctx.moveTo(x, y);
-                else ctx.lineTo(x, y);
-            }
-
-            ctx.strokeStyle = color;
-            ctx.globalAlpha = isFocused ? 0.85 : 0.45;
-            ctx.lineWidth = isFocused ? 1.8 : 1.1;
-            ctx.stroke();
-
-            ctx.lineTo(w, zeroY);
-            ctx.lineTo(0, zeroY);
-            ctx.closePath();
-            ctx.fillStyle = color;
-            ctx.globalAlpha = isFocused ? 0.18 : 0.08;
-            ctx.fill();
-        }
-        ctx.restore();
-    }
-
-    // -------------------------------------------------------------
-    // 6. MASTER COMPOSITE EQ RESPONSE CURVE
-    // -------------------------------------------------------------
-    drawEQResponseCurve(ctx, w, h) {
-        const isGraphic = (this.audio.eqMode === "graphic");
-        const activeNodes = isGraphic ? this.audio.graphicFilterNodes : this.audio.filterNodes;
-        if (!activeNodes || activeNodes.length === 0) return;
+    drawMasterEQCurve(ctx, w, h) {
+        if (!this.audio.filterNodes || this.audio.filterNodes.length === 0) return;
 
         const numPoints = this.numResponsePoints;
         const totalMag = new Float32Array(numPoints).fill(1.0);
         const tempMag = new Float32Array(numPoints);
         const tempPhase = new Float32Array(numPoints);
 
-        for (let b = 0; b < activeNodes.length; b++) {
-            const node = activeNodes[b];
-            if (!this.audio.isBypassed) {
-                if (isGraphic || this.audio.bands[b].enabled) {
-                    node.getFrequencyResponse(this.responseFreqs, tempMag, tempPhase);
+        const nodes = this.audio.filterNodes;
+
+        if (!this.audio.isBypassed) {
+            for (let b = 0; b < this.audio.bands.length; b++) {
+                if (this.audio.bands[b].enabled && nodes[b]) {
+                    nodes[b].getFrequencyResponse(this.responseFreqs, tempMag, tempPhase);
                     for (let i = 0; i < numPoints; i++) {
                         totalMag[i] *= tempMag[i];
                     }
@@ -862,225 +397,159 @@ class EQCanvas {
 
         ctx.save();
         ctx.beginPath();
-        const zeroY = this.dbToY(0);
 
         for (let i = 0; i < numPoints; i++) {
             const freq = this.responseFreqs[i];
-            const mag = totalMag[i];
-            const db = 20 * Math.log10(Math.max(0.0001, mag));
+            const magDb = 20 * Math.log10(Math.max(1e-6, totalMag[i]));
             const x = this.freqToX(freq);
-            const y = this.dbToY(db);
+            const y = this.dbToY(magDb);
 
             if (i === 0) ctx.moveTo(x, y);
             else ctx.lineTo(x, y);
         }
 
-        const curveColor = this.audio.isBypassed
-            ? "rgba(255, 255, 255, 0.35)"
-            : (isGraphic ? "#00d2ff" : "#ffd60a");
-
-        ctx.strokeStyle = curveColor;
-        ctx.lineWidth = 2.6;
-        ctx.shadowColor = this.audio.isBypassed ? "transparent" : curveColor;
+        // Glowing EQ response line
+        ctx.shadowColor = "rgba(255, 214, 10, 0.6)";
         ctx.shadowBlur = 10;
+        ctx.strokeStyle = "#ffd60a";
+        ctx.lineWidth = 2.6;
         ctx.stroke();
-
-        if (isGraphic) {
-            ctx.lineTo(w, zeroY);
-            ctx.lineTo(0, zeroY);
-            ctx.closePath();
-            const fillGrad = ctx.createLinearGradient(0, this.paddingTop, 0, h - this.paddingBottom);
-            fillGrad.addColorStop(0, "rgba(0, 210, 255, 0.16)");
-            fillGrad.addColorStop(0.5, "rgba(0, 210, 255, 0.05)");
-            fillGrad.addColorStop(1, "rgba(0, 210, 255, 0.0)");
-            ctx.fillStyle = fillGrad;
-            ctx.shadowBlur = 0;
-            ctx.fill();
-        }
 
         ctx.restore();
     }
 
-    // -------------------------------------------------------------
-    // 7. LIVE CURSOR CROSSHAIR
-    // -------------------------------------------------------------
-    drawCursorCrosshair(ctx, w, h) {
-        if (!this.cursorPos || this.isDragging || this.isDraggingGraphic) return;
-        const { x, y } = this.cursorPos;
-        if (y < this.paddingTop || y > h - this.paddingBottom) return;
+    drawSweetSpots(ctx, w, h) {
+        if (!this.activeZones || this.activeZones.length === 0) return;
+        const bottomY = h - this.paddingBottom;
 
         ctx.save();
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.13)";
-        ctx.lineWidth = 1;
-        ctx.setLineDash([3, 3]);
 
-        ctx.beginPath();
-        ctx.moveTo(x, this.paddingTop);
-        ctx.lineTo(x, h - this.paddingBottom);
-        ctx.moveTo(0, y);
-        ctx.lineTo(w, y);
-        ctx.stroke();
-        ctx.restore();
-    }
+        this.activeZones.forEach((zone, index) => {
+            const freq = zone.centerFreq;
+            const x = Math.round(this.freqToX(freq));
+            const currentGain = (this.audio.bands[index] ? this.audio.bands[index].gain : 0);
+            const nodeY = Math.round(this.dbToY(currentGain));
+            const color = zone.color || "#00d2ff";
+            const isHovered = (this.hoveredIndex === index || this.draggedIndex === index);
 
-    // -------------------------------------------------------------
-    // 8. GRAPHIC & PARAMETRIC DRAGGABLE NODES
-    // -------------------------------------------------------------
-    drawGraphicNodes(ctx, w, h) {
-        const freqs = this.audio.graphicFreqs;
-        const gains = this.audio.graphicGains;
-        const zeroY = this.dbToY(0);
-        const isNarrow = (w < 540);
-
-        ctx.save();
-        for (let i = 0; i < freqs.length; i++) {
-            const f = freqs[i];
-            const g = gains[i];
-            const x = this.freqToX(f);
-            const y = this.dbToY(g);
-
-            ctx.strokeStyle = "rgba(0, 210, 255, 0.15)";
-            ctx.lineWidth = 1;
-            ctx.setLineDash([2, 4]);
+            // 1. Vertical Target Guide Line (Dashed Laser)
+            ctx.save();
             ctx.beginPath();
+            ctx.setLineDash([4, 4]);
             ctx.moveTo(x, this.paddingTop);
-            ctx.lineTo(x, h - this.paddingBottom);
-            ctx.stroke();
-
-            ctx.setLineDash([]);
-            ctx.strokeStyle = g >= 0 ? "rgba(0, 210, 255, 0.75)" : "rgba(255, 69, 58, 0.75)";
-            ctx.lineWidth = isNarrow ? 2.5 : 3;
-            ctx.beginPath();
-            ctx.moveTo(x, zeroY);
-            ctx.lineTo(x, y);
-            ctx.stroke();
-
-            const capW = isNarrow ? 16 : 20;
-            const capH = isNarrow ? 10 : 12;
-            ctx.fillStyle = g >= 0 ? "#00d2ff" : "#ff453a";
-            ctx.shadowColor = g >= 0 ? "#00d2ff" : "#ff453a";
-            ctx.shadowBlur = (this.selectedGraphicBand === i) ? 14 : 6;
-            ctx.beginPath();
-            if (ctx.roundRect) {
-                ctx.roundRect(x - capW / 2, y - capH / 2, capW, capH, 3);
-            } else {
-                ctx.rect(x - capW / 2, y - capH / 2, capW, capH);
+            ctx.lineTo(x, bottomY);
+            ctx.strokeStyle = isHovered ? color : "rgba(255, 255, 255, 0.18)";
+            ctx.lineWidth = isHovered ? 2.0 : 1.2;
+            if (isHovered) {
+                ctx.shadowColor = color;
+                ctx.shadowBlur = 8;
             }
-            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
 
-            ctx.fillStyle = "#ffffff";
-            ctx.fillRect(x - 4, y - 1, 8, 2);
+            // 2. Top Pin Badge Callout (Tag with frequency & short title)
+            const cleanName = zone.name.split("(")[0].trim();
+            const freqText = freq >= 1000 ? `${(freq / 1000).toFixed(1)}k` : `${Math.round(freq)}`;
+            const pinText = `${freqText} Hz · ${cleanName}`;
 
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = "#ffffff";
-            ctx.font = `600 ${isNarrow ? 8.5 : 9.5}px 'JetBrains Mono', monospace`;
-            ctx.textAlign = "center";
-            const valStr = (g > 0 ? "+" : "") + g.toFixed(1);
-            ctx.fillText(valStr, x, y - 9);
-        }
-        ctx.restore();
-    }
-
-    drawBandNodes(ctx, w, h) {
-        if (this.audio.eqMode === "graphic") {
-            this.drawGraphicNodes(ctx, w, h);
-            return;
-        }
-
-        const bands = this.audio.bands;
-        const isNarrow = (w < 540);
-
-        bands.forEach((b, i) => {
-            const x = this.freqToX(b.freq);
-            const y = this.dbToY(b.gain);
-            const isHovered = (this.hoveredBand === i);
-            const isSelected = (this.selectedBand === i);
-            const isSoloed = (this.audio.soloBandIndex === i);
-            const color = BAND_COLORS[i % BAND_COLORS.length];
+            ctx.font = "600 11px 'Prompt', sans-serif";
+            const textWidth = ctx.measureText(pinText).width;
+            const badgeW = Math.max(68, textWidth + 14);
+            const badgeH = 22;
+            const badgeX = Math.max(4, Math.min(w - badgeW - 4, x - badgeW / 2));
+            const badgeY = 12;
 
             ctx.save();
-
-            if (!b.enabled) {
-                ctx.globalAlpha = 0.35;
+            // Badge background
+            ctx.fillStyle = isHovered ? color : "rgba(20, 24, 34, 0.9)";
+            ctx.strokeStyle = color;
+            ctx.lineWidth = isHovered ? 2 : 1.2;
+            if (isHovered) {
+                ctx.shadowColor = color;
+                ctx.shadowBlur = 10;
             }
 
-            if (isSoloed) {
+            if (ctx.roundRect) {
                 ctx.beginPath();
-                ctx.arc(x, y, 20, 0, Math.PI * 2);
-                ctx.fillStyle = "rgba(255, 55, 95, 0.32)";
+                ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 5);
                 ctx.fill();
-                ctx.strokeStyle = "#ff375f";
-                ctx.lineWidth = 2;
-                ctx.setLineDash([3, 3]);
                 ctx.stroke();
-                ctx.setLineDash([]);
+            } else {
+                ctx.fillRect(badgeX, badgeY, badgeW, badgeH);
+                ctx.strokeRect(badgeX, badgeY, badgeW, badgeH);
             }
 
-            if (isSelected || isHovered) {
-                ctx.beginPath();
-                ctx.arc(x, y, isNarrow ? 13 : 15, 0, Math.PI * 2);
-                ctx.strokeStyle = color;
-                ctx.lineWidth = 1.5;
-                ctx.globalAlpha = b.enabled ? 0.65 : 0.3;
-                ctx.stroke();
-                ctx.globalAlpha = b.enabled ? 1.0 : 0.35;
-            }
-
-            const r = isSelected ? (isNarrow ? 9.5 : 10.5) : (isHovered ? 9.5 : (isNarrow ? 8 : 8.5));
-            ctx.beginPath();
-            ctx.arc(x, y, r, 0, Math.PI * 2);
-            ctx.fillStyle = color;
-            ctx.shadowColor = color;
-            ctx.shadowBlur = (isSelected || isHovered) ? 14 : 5;
-            ctx.fill();
-
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = "#0b0d13";
-            ctx.font = `800 ${isNarrow ? 9 : 10}px 'JetBrains Mono', monospace`;
+            // Badge text
+            ctx.fillStyle = isHovered ? "#000000" : "#ffffff";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            ctx.fillText((i + 1).toString(), x, y + 0.5);
+            ctx.fillText(pinText, badgeX + badgeW / 2, badgeY + badgeH / 2);
+            ctx.restore();
 
-            // Floating HUD Callout on Selected / Hovered Node
-            if (isSelected || isHovered) {
-                const textHz = b.freq >= 1000 ? (b.freq / 1000).toFixed(2) + " kHz" : Math.round(b.freq) + " Hz";
-                const note = this.freqToMusicalNote(b.freq);
-                const textDb = (b.gain > 0 ? "+" : "") + b.gain.toFixed(1) + " dB";
-                const textQ = "Q " + b.q.toFixed(2);
-                const tooltipText = isNarrow
-                    ? `B${i + 1}: ${textHz} • ${textDb} • ${textQ}`
-                    : `B${i + 1} (${b.label})  •  ${textHz} [${note}]  •  ${textDb}  •  ${textQ}`;
+            // 3. Interactive Draggable Node on the EQ Curve
+            ctx.save();
+            const nodeRadius = isHovered ? 10 : 8;
 
-                ctx.font = `600 ${isNarrow ? 9.5 : 10.5}px 'JetBrains Mono', monospace`;
-                const textWidth = ctx.measureText(tooltipText).width;
-                const boxW = Math.min(w - 12, textWidth + 16);
-                const boxX = Math.max(6, Math.min(w - boxW - 6, x - boxW / 2));
-                const tipY = (y > this.paddingTop + 42) ? y - 22 : y + 24;
+            // Outer glowing ring
+            ctx.beginPath();
+            ctx.arc(x, nodeY, nodeRadius + 3, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.globalAlpha = isHovered ? 0.45 : 0.2;
+            ctx.fill();
 
-                ctx.fillStyle = "rgba(11, 14, 22, 0.94)";
+            // Main node circle
+            ctx.globalAlpha = 1.0;
+            ctx.beginPath();
+            ctx.arc(x, nodeY, nodeRadius, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.shadowColor = color;
+            ctx.shadowBlur = isHovered ? 14 : 6;
+            ctx.fill();
+
+            // Inner center dot
+            ctx.beginPath();
+            ctx.arc(x, nodeY, 3, 0, Math.PI * 2);
+            ctx.fillStyle = "#ffffff";
+            ctx.fill();
+            ctx.restore();
+
+            // 4. Live Gain Badge near the node (if gain is not 0 dB or hovered)
+            if (currentGain !== 0 || isHovered) {
+                const gainStr = `${currentGain > 0 ? "+" : ""}${currentGain.toFixed(1)} dB`;
+                ctx.save();
+                ctx.font = "700 10px 'JetBrains Mono', monospace";
+                const gTextW = ctx.measureText(gainStr).width;
+                const gBadgeW = gTextW + 8;
+                const gBadgeH = 16;
+                const gX = Math.max(4, Math.min(w - gBadgeW - 4, x + (x > w - 60 ? -gBadgeW - 12 : 12)));
+                const gY = nodeY - 8;
+
+                ctx.fillStyle = "rgba(10, 14, 22, 0.92)";
                 ctx.strokeStyle = color;
-                ctx.lineWidth = 1.2;
-                ctx.beginPath();
+                ctx.lineWidth = 1;
                 if (ctx.roundRect) {
-                    ctx.roundRect(boxX, tipY - 11, boxW, 20, 5);
+                    ctx.beginPath();
+                    ctx.roundRect(gX, gY, gBadgeW, gBadgeH, 3);
+                    ctx.fill();
+                    ctx.stroke();
                 } else {
-                    ctx.rect(boxX, tipY - 11, boxW, 20);
+                    ctx.fillRect(gX, gY, gBadgeW, gBadgeH);
+                    ctx.strokeRect(gX, gY, gBadgeW, gBadgeH);
                 }
-                ctx.fill();
-                ctx.stroke();
 
                 ctx.fillStyle = "#ffffff";
-                ctx.textBaseline = "alphabetic";
                 ctx.textAlign = "center";
-                ctx.fillText(tooltipText, boxX + boxW / 2, tipY + 2.5);
+                ctx.textBaseline = "middle";
+                ctx.fillText(gainStr, gX + gBadgeW / 2, gY + gBadgeH / 2);
+                ctx.restore();
             }
-
-            ctx.restore();
         });
+
+        ctx.restore();
     }
 }
 
+// Export to window
 if (typeof window !== "undefined") {
     window.EQCanvas = EQCanvas;
-    window.BAND_COLORS = BAND_COLORS;
 }

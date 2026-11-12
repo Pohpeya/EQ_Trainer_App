@@ -327,6 +327,53 @@ class AudioEngine {
         return energies;
     }
 
+    setInstrumentSweetSpots(zones) {
+        if (!zones) return;
+        for (let i = 0; i < this.bands.length; i++) {
+            if (i < zones.length) {
+                const z = zones[i];
+                this.bands[i].freq = z.centerFreq;
+                this.bands[i].q = z.q || 2.0;
+                this.bands[i].type = "peaking";
+                this.bands[i].gain = 0;
+                this.bands[i].enabled = true;
+                this.bands[i].color = z.color;
+                this.bands[i].label = z.name.split("(")[0].trim();
+                this.bands[i].zone = z;
+            } else {
+                this.bands[i].gain = 0;
+                this.bands[i].enabled = false;
+            }
+            const node = this.filterNodes[i];
+            if (node && this.ctx) {
+                node.type = this.bands[i].type;
+                node.frequency.setTargetAtTime(this.bands[i].freq, this.ctx.currentTime, 0.01);
+                node.Q.setTargetAtTime(this.bands[i].q, this.ctx.currentTime, 0.01);
+                if (node.gain) node.gain.setTargetAtTime(0, this.ctx.currentTime, 0.01);
+            }
+        }
+    }
+
+    setSweetSpotGain(index, gainDb) {
+        if (index < 0 || index >= this.bands.length) return;
+        const clamped = Math.max(-12, Math.min(12, gainDb));
+        this.bands[index].gain = clamped;
+        const node = this.filterNodes[index];
+        if (node && node.gain && this.ctx) {
+            node.gain.setTargetAtTime(this.isBypassed ? 0 : clamped, this.ctx.currentTime, 0.01);
+        }
+    }
+
+    resetSweetSpots() {
+        for (let i = 0; i < this.bands.length; i++) {
+            this.bands[i].gain = 0;
+            const node = this.filterNodes[i];
+            if (node && node.gain && this.ctx) {
+                node.gain.setTargetAtTime(0, this.ctx.currentTime, 0.01);
+            }
+        }
+    }
+
     updateBand(index, params) {
         if (index < 0 || index >= this.bands.length) return;
         const b = this.bands[index];
