@@ -111,8 +111,15 @@ class EQCanvas {
 
         const getPos = (e) => {
             const rect = c.getBoundingClientRect();
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            let clientX = e.clientX;
+            let clientY = e.clientY;
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else if (e.changedTouches && e.changedTouches.length > 0) {
+                clientX = e.changedTouches[0].clientX;
+                clientY = e.changedTouches[0].clientY;
+            }
             return {
                 x: clientX - rect.left,
                 y: clientY - rect.top
@@ -135,11 +142,11 @@ class EQCanvas {
                 const dy = y - nodeY;
                 const distNode = Math.sqrt(dx * dx + dy * dy);
 
-                // Distance to node handle (36px) or vertical line (28px)
+                // Distance to node handle (36px) or vertical line (32px)
                 if (distNode < 36 && distNode < minDistance) {
                     minDistance = distNode;
                     bestIdx = i;
-                } else if (Math.abs(dx) < 28 && Math.abs(dx) < minDistance) {
+                } else if (Math.abs(dx) < 32 && Math.abs(dx) < minDistance) {
                     minDistance = Math.abs(dx);
                     bestIdx = i;
                 }
@@ -164,13 +171,9 @@ class EQCanvas {
                 const newGain = Math.round(this.yToDb(pos.y) * 2) / 2; // snap to 0.5 dB
                 const clampedGain = Math.max(-12, Math.min(12, newGain));
 
-                // Frequency shift (±300 Hz from default centerFreq)
-                const b = this.audio.bands[this.draggedIndex];
-                const defaultF = (b && b.defaultFreq) ? b.defaultFreq : (b ? b.freq : 100);
-                const minF = Math.max(20, defaultF - 300);
-                const maxF = Math.min(20000, defaultF + 300);
+                // Free frequency sweep (20 Hz - 20,000 Hz)
                 const rawFreq = this.xToFreq(pos.x);
-                const clampedFreq = Math.round(Math.max(minF, Math.min(maxF, rawFreq)));
+                const clampedFreq = Math.round(Math.max(20, Math.min(20000, rawFreq)));
 
                 if (this.onSweetSpotChange) {
                     this.onSweetSpotChange(this.draggedIndex, clampedGain, clampedFreq);
@@ -214,13 +217,8 @@ class EQCanvas {
 
                 const newGain = Math.round(this.yToDb(pos.y) * 2) / 2;
                 const clampedGain = Math.max(-12, Math.min(12, newGain));
-
-                const b = this.audio.bands[nearest];
-                const defaultF = (b && b.defaultFreq) ? b.defaultFreq : (b ? b.freq : 100);
-                const minF = Math.max(20, defaultF - 300);
-                const maxF = Math.min(20000, defaultF + 300);
                 const rawFreq = this.xToFreq(pos.x);
-                const clampedFreq = Math.round(Math.max(minF, Math.min(maxF, rawFreq)));
+                const clampedFreq = Math.round(Math.max(20, Math.min(20000, rawFreq)));
 
                 if (this.onSweetSpotChange) {
                     this.onSweetSpotChange(nearest, clampedGain, clampedFreq);
@@ -250,14 +248,30 @@ class EQCanvas {
             }
         }, { passive: false });
 
-        c.addEventListener("mousedown", onStart);
-        window.addEventListener("mousemove", onMove);
-        window.addEventListener("mouseup", onEnd);
+        if (window.PointerEvent) {
+            c.addEventListener("pointerdown", (e) => {
+                try { c.setPointerCapture(e.pointerId); } catch (_) {}
+                onStart(e);
+            });
+            c.addEventListener("pointermove", onMove);
+            c.addEventListener("pointerup", (e) => {
+                try { c.releasePointerCapture(e.pointerId); } catch (_) {}
+                onEnd();
+            });
+            c.addEventListener("pointercancel", (e) => {
+                try { c.releasePointerCapture(e.pointerId); } catch (_) {}
+                onEnd();
+            });
+        } else {
+            c.addEventListener("mousedown", onStart);
+            window.addEventListener("mousemove", onMove);
+            window.addEventListener("mouseup", onEnd);
 
-        c.addEventListener("touchstart", onStart, { passive: false });
-        window.addEventListener("touchmove", onMove, { passive: false });
-        window.addEventListener("touchend", onEnd);
-        window.addEventListener("touchcancel", onEnd);
+            c.addEventListener("touchstart", onStart, { passive: false });
+            window.addEventListener("touchmove", onMove, { passive: false });
+            window.addEventListener("touchend", onEnd);
+            window.addEventListener("touchcancel", onEnd);
+        }
 
         c.addEventListener("dblclick", (e) => {
             const pos = getPos(e);

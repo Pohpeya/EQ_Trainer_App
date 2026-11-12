@@ -415,6 +415,9 @@ html, body {
     height: 100%;
     display: block;
     cursor: crosshair;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 /* ==========================================================================

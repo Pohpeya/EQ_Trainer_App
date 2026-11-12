@@ -380,10 +380,7 @@ class AudioEngine {
     setSweetSpotFreq(index, freq) {
         if (index < 0 || index >= this.bands.length) return;
         const b = this.bands[index];
-        const defaultF = b.defaultFreq || b.freq;
-        const minF = Math.max(20, defaultF - 300);
-        const maxF = Math.min(20000, defaultF + 300);
-        const clampedFreq = Math.max(minF, Math.min(maxF, freq));
+        const clampedFreq = Math.max(20, Math.min(20000, freq));
         b.freq = clampedFreq;
         const node = this.filterNodes[index];
         if (node && this.ctx) {

@@ -145,8 +145,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const currentQ = b ? b.q : (zone.q || 1.4);
             const currentType = b ? b.type : "peaking";
 
-            const minF = Math.max(20, defaultFreq - 300);
-            const maxF = defaultFreq + 300;
+            const minF = Math.max(20, Math.round(defaultFreq / 4));
+            const maxF = Math.min(20000, Math.round(defaultFreq * 4));
             const freqDelta = Math.round(currentFreq - defaultFreq);
 
             const gainSign = currentGain > 0 ? `+${currentGain.toFixed(1)}` : `${currentGain.toFixed(1)}`;
@@ -222,22 +222,22 @@ document.addEventListener("DOMContentLoaded", () => {
                     <span class="fader-limit">+12 dB</span>
                 </div>
 
-                <!-- Frequency Shift Slider (±300 Hz) -->
+                <!-- Frequency Shift Slider -->
                 <div class="card-freq-shift-section">
                     <div class="freq-shift-header">
-                        <span class="sub-ctrl-label">กวาดความถี่ (Sweep ±300 Hz):</span>
+                        <span class="sub-ctrl-label">กวาดความถี่ (Sweep):</span>
                         <div class="freq-readout-wrap">
-                            <strong class="freq-val-text" id="freqValText_${index}">${Math.round(currentFreq)} Hz</strong>
-                            <span class="freq-delta-pill" id="freqDeltaPill_${index}">${freqDelta !== 0 ? (freqDelta > 0 ? `+${freqDelta}` : `${freqDelta}`) + ' Hz' : '±0'}</span>
+                            <strong class="freq-val-text" id="freqValText_${index}">${formatHz(currentFreq)}</strong>
+                            <span class="freq-delta-pill ${freqDelta !== 0 ? 'shifted' : ''}" id="freqDeltaPill_${index}">${freqDelta !== 0 ? (freqDelta > 0 ? `+${freqDelta}` : `${freqDelta}`) + ' Hz' : '±0'}</span>
                         </div>
-                        <button type="button" class="btn-reset-freq" data-index="${index}" data-default="${defaultFreq}" title="คืนค่าความถี่มาตรฐาน (${defaultFreq} Hz)">
+                        <button type="button" class="btn-reset-freq" data-index="${index}" data-default="${defaultFreq}" title="คืนค่าความถี่มาตรฐาน (${formatHz(defaultFreq)})">
                             🔄 เดิม
                         </button>
                     </div>
                     <div class="freq-shift-slider-row">
-                        <span class="f-limit">${minF} Hz</span>
+                        <span class="f-limit">${formatHz(minF)}</span>
                         <input type="range" class="freq-range" id="freqSlider_${index}" data-index="${index}" min="${minF}" max="${maxF}" step="1" value="${currentFreq}">
-                        <span class="f-limit">${maxF} Hz</span>
+                        <span class="f-limit">${formatHz(maxF)}</span>
                     </div>
                 </div>
 
@@ -428,20 +428,33 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Update Slider
         const fSlider = document.getElementById(`freqSlider_${index}`);
-        if (fSlider && Math.abs(parseFloat(fSlider.value) - curFreq) > 0.5) {
-            fSlider.value = curFreq;
+        if (fSlider) {
+            if (curFreq < parseFloat(fSlider.min)) {
+                fSlider.min = Math.max(20, Math.floor(curFreq * 0.8));
+                const minLbl = fSlider.parentElement.querySelector(".f-limit:first-child");
+                if (minLbl) minLbl.textContent = formatHz(fSlider.min);
+            }
+            if (curFreq > parseFloat(fSlider.max)) {
+                fSlider.max = Math.min(20000, Math.ceil(curFreq * 1.2));
+                const maxLbl = fSlider.parentElement.querySelector(".f-limit:last-child");
+                if (maxLbl) maxLbl.textContent = formatHz(fSlider.max);
+            }
+            if (Math.abs(parseFloat(fSlider.value) - curFreq) > 0.5) {
+                fSlider.value = curFreq;
+            }
         }
 
         // Update Readout text
         const textVal = document.getElementById(`freqValText_${index}`);
         if (textVal) {
-            textVal.textContent = `${Math.round(curFreq)} Hz`;
+            textVal.textContent = formatHz(curFreq);
         }
 
         // Update Delta pill
         const deltaPill = document.getElementById(`freqDeltaPill_${index}`);
         if (deltaPill) {
-            deltaPill.textContent = delta !== 0 ? (delta > 0 ? `+${delta}` : `${delta}`) + ' Hz' : '±0';
+            const deltaStr = Math.abs(delta) >= 1000 ? `${(delta / 1000).toFixed(1)}k` : `${delta}`;
+            deltaPill.textContent = delta !== 0 ? (delta > 0 ? `+${deltaStr} Hz` : `${deltaStr} Hz`) : '±0';
             deltaPill.classList.toggle("shifted", delta !== 0);
         }
     }
